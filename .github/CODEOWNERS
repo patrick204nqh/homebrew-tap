@@ -1,0 +1,11 @@
+# Code Owners for homebrew-tap
+# These owners will be requested for review when PRs are opened
+
+# All formulas
+/Formula/ @patrick204nqh
+
+# Workflows and automation
+/.github/ @patrick204nqh
+
+# Default owner for everything else
+* @patrick204nqh
