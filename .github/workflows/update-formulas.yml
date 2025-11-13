@@ -1,0 +1,163 @@
+name: Update Formulas
+
+on:
+  schedule:
+    # Run weekly on Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      formula:
+        description: 'Specific formula to update (leave empty for all)'
+        required: false
+        type: string
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    outputs:
+      updates: ${{ steps.check.outputs.updates }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for updates
+        id: check
+        run: |
+          # Array to store formulas with updates
+          updates='[]'
+
+          # Check each formula
+          for formula in Formula/*.rb; do
+            formula_name=$(basename "$formula" .rb)
+
+            # Skip if specific formula requested and this isn't it
+            if [ -n "${{ inputs.formula }}" ] && [ "$formula_name" != "${{ inputs.formula }}" ]; then
+              continue
+            fi
+
+            echo "Checking $formula_name..."
+
+            # Extract current version from formula
+            current_version=$(grep -oP "archive/refs/tags/v\K[0-9]+\.[0-9]+\.[0-9]+" "$formula" | head -1)
+
+            # Extract repo URL from formula
+            repo_url=$(grep -oP 'url.*github.com/\K[^/]+/[^/]+' "$formula" | head -1)
+
+            if [ -z "$current_version" ] || [ -z "$repo_url" ]; then
+              echo "Could not extract version or repo for $formula_name"
+              continue
+            fi
+
+            echo "Current version: $current_version"
+            echo "Repository: $repo_url"
+
+            # Fetch latest release from GitHub API
+            latest_release=$(curl -s "https://api.github.com/repos/$repo_url/releases/latest")
+            latest_version=$(echo "$latest_release" | jq -r '.tag_name' | sed 's/^v//')
+
+            if [ "$latest_version" = "null" ] || [ -z "$latest_version" ]; then
+              echo "No releases found for $formula_name"
+              continue
+            fi
+
+            echo "Latest version: $latest_version"
+
+            # Compare versions
+            if [ "$current_version" != "$latest_version" ]; then
+              echo "Update available: $current_version -> $latest_version"
+
+              # Add to updates array
+              updates=$(echo "$updates" | jq --arg name "$formula_name" \
+                --arg repo "$repo_url" \
+                --arg current "$current_version" \
+                --arg latest "$latest_version" \
+                '. += [{"name": $name, "repo": $repo, "current": $current, "latest": $latest}]')
+            else
+              echo "Already up to date"
+            fi
+
+            echo "---"
+          done
+
+          echo "updates=$updates" >> $GITHUB_OUTPUT
+          echo "Found updates:"
+          echo "$updates" | jq '.'
+
+  update-formulas:
+    needs: check-updates
+    if: needs.check-updates.outputs.updates != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        formula: ${{ fromJson(needs.check-updates.outputs.updates) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update formula
+        run: |
+          formula_name="${{ matrix.formula.name }}"
+          repo="${{ matrix.formula.repo }}"
+          latest_version="${{ matrix.formula.latest }}"
+
+          echo "Updating $formula_name to v$latest_version"
+
+          # Download tarball
+          tarball_url="https://github.com/$repo/archive/refs/tags/v${latest_version}.tar.gz"
+          wget "$tarball_url" -O tarball.tar.gz
+
+          # Calculate SHA256
+          sha256=$(shasum -a 256 tarball.tar.gz | cut -d' ' -f1)
+          echo "SHA256: $sha256"
+
+          # Update formula
+          sed -i "s|archive/refs/tags/v.*\.tar\.gz|archive/refs/tags/v${latest_version}.tar.gz|" "Formula/${formula_name}.rb"
+          sed -i "s|sha256 '.*'|sha256 '${sha256}'|" "Formula/${formula_name}.rb"
+
+          # Show changes
+          git diff "Formula/${formula_name}.rb"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            Update ${{ matrix.formula.name }} to v${{ matrix.formula.latest }}
+
+            - Upgrade from v${{ matrix.formula.current }} to v${{ matrix.formula.latest }}
+            - Update SHA256 checksum
+            - Auto-detected by formula update workflow
+          branch: update-${{ matrix.formula.name }}-v${{ matrix.formula.latest }}
+          delete-branch: true
+          title: Update ${{ matrix.formula.name }} to v${{ matrix.formula.latest }}
+          body: |
+            ## 🔄 Formula Update
+
+            Auto-detected update for **${{ matrix.formula.name }}**.
+
+            ### Changes
+            - ⬆️ Update from `v${{ matrix.formula.current }}` to `v${{ matrix.formula.latest }}`
+            - 🔐 Update SHA256 checksum
+            - 🔗 Update download URL
+
+            ### Links
+            - 📦 [GitHub Repository](https://github.com/${{ matrix.formula.repo }})
+            - 📝 [Release Notes](https://github.com/${{ matrix.formula.repo }}/releases/tag/v${{ matrix.formula.latest }})
+            - 📖 [Changelog](https://github.com/${{ matrix.formula.repo }}/blob/main/CHANGELOG.md)
+
+            ### Testing
+
+            Test this formula before merging:
+            ```bash
+            brew tap patrick204nqh/tap
+            brew install --build-from-source patrick204nqh/tap/${{ matrix.formula.name }}
+            brew test ${{ matrix.formula.name }}
+            brew audit --strict ${{ matrix.formula.name }}
+            ```
+
+            ---
+
+            🤖 *Auto-generated by [update-formulas workflow](https://github.com/patrick204nqh/homebrew-tap/actions)*
+          labels: |
+            automated
+            formula-update
+          committer: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
+          author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
