@@ -7,8 +7,8 @@ class SumologicQuery < Formula
   sha256 '4cb6e2f1377da0d917618ac9dc32db0f2c87452c2270878802f6dd1ccc56dd7c' # Will be calculated after first release
   license 'MIT'
 
-  # Use system Ruby instead of building from source (much faster!)
-  uses_from_macos 'ruby', since: :catalina
+  # Use Homebrew Ruby (pre-built bottle, fast install)
+  depends_on 'ruby'
 
   def install
     ENV['GEM_HOME'] = libexec
