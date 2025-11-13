@@ -78,7 +78,11 @@ jobs:
             echo "---"
           done
 
-          echo "updates=$updates" >> $GITHUB_OUTPUT
+          # Write updates to output with proper escaping
+          echo "updates<<EOF" >> $GITHUB_OUTPUT
+          echo "$updates" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
           echo "Found updates:"
           echo "$updates" | jq '.'
 
