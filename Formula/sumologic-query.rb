@@ -7,14 +7,22 @@ class SumologicQuery < Formula
   sha256 '4cb6e2f1377da0d917618ac9dc32db0f2c87452c2270878802f6dd1ccc56dd7c' # Will be calculated after first release
   license 'MIT'
 
-  depends_on 'ruby' => :build
+  # Use system Ruby instead of building from source (much faster!)
+  uses_from_macos 'ruby', since: :catalina
 
   def install
     ENV['GEM_HOME'] = libexec
+
+    # Build and install gem with system Ruby
     system 'gem', 'build', 'sumologic-query.gemspec'
-    system 'gem', 'install', "sumologic-query-#{version}.gem"
-    bin.install libexec / 'bin/sumo-query'
-    bin.env_script_all_files(libexec / 'bin', GEM_HOME: ENV.fetch('GEM_HOME', nil))
+    system 'gem', 'install', '--no-document', "sumologic-query-#{version}.gem"
+
+    # Create wrapper script with proper gem paths
+    (bin / 'sumo-query').write_env_script(
+      libexec / 'bin/sumo-query',
+      GEM_HOME: libexec,
+      GEM_PATH: libexec
+    )
   end
 
   test do
