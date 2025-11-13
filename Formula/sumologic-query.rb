@@ -3,8 +3,8 @@
 class SumologicQuery < Formula
   desc 'Lightweight Ruby CLI for querying Sumo Logic logs quickly'
   homepage 'https://github.com/patrick204nqh/sumologic-query'
-  url 'https://github.com/patrick204nqh/sumologic-query/archive/refs/tags/v1.0.0.tar.gz'
-  sha256 '' # Will be calculated after first release
+  url 'https://github.com/patrick204nqh/sumologic-query/archive/refs/tags/v1.0.1.tar.gz'
+  sha256 'eaac6facfa89102c7c09b468de1a12317404001b29da87f941014d246b6bea83' # Will be calculated after first release
   license 'MIT'
 
   depends_on 'ruby' => :build
