@@ -117,50 +117,12 @@ jobs:
           sha256=$(shasum -a 256 tarball.tar.gz | cut -d' ' -f1)
           echo "SHA256: $sha256"
 
-          # Update formula - ONLY the main package URL and SHA256 (not resource blocks)
-          # Read the formula file
-          formula_file="Formula/${formula_name}.rb"
-
-          # Create Ruby script to update only the main URL and SHA256 (before any 'resource' blocks)
-          ruby << 'RUBY_SCRIPT'
-            formula_file = ENV['FORMULA_FILE']
-            latest_version = ENV['LATEST_VERSION']
-            new_sha256 = ENV['NEW_SHA256']
-
-            content = File.read(formula_file)
-
-            # Split at first 'resource' to only update main formula section
-            parts = content.split(/^\s*resource\s/, 2)
-            main_section = parts[0]
-            resource_section = parts.length > 1 ? parts[1] : ""
-
-            # Update URL in main section only
-            main_section.sub!(
-              /url\s+'https:\/\/github\.com\/[^']+\/archive\/refs\/tags\/v[^']+\.tar\.gz'/,
-              "url 'https://github.com/#{ENV['REPO']}/archive/refs/tags/v#{latest_version}.tar.gz'"
-            )
-
-            # Update SHA256 in main section only (first occurrence)
-            main_section.sub!(
-              /sha256\s+'[^']+'/,
-              "sha256 '#{new_sha256}'"
-            )
-
-            # Reconstruct file
-            result = if resource_section.empty?
-              main_section
-            else
-              main_section + "  resource " + resource_section
-            end
-
-            File.write(formula_file, result)
-          RUBY_SCRIPT
-
-          env FORMULA_FILE="$formula_file" \
-              LATEST_VERSION="$latest_version" \
-              NEW_SHA256="$sha256" \
-              REPO="$repo" \
-              ruby
+          # Update formula using script (preserves gem resource SHA256 hashes)
+          .github/scripts/update-formula.sh \
+            "Formula/${formula_name}.rb" \
+            "$latest_version" \
+            "$sha256" \
+            "$repo"
 
           # Show changes
           git diff "Formula/${formula_name}.rb"
