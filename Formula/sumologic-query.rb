@@ -3,8 +3,8 @@
 class SumologicQuery < Formula
   desc 'Lightweight Ruby CLI for querying Sumo Logic logs quickly'
   homepage 'https://github.com/patrick204nqh/sumologic-query'
-  url 'https://github.com/patrick204nqh/sumologic-query/archive/refs/tags/v1.1.0.tar.gz'
-  sha256 '4cb6e2f1377da0d917618ac9dc32db0f2c87452c2270878802f6dd1ccc56dd7c'
+  url 'https://github.com/patrick204nqh/sumologic-query/archive/refs/tags/v1.1.1.tar.gz'
+  sha256 'b88b90a69a69296bf72d26c0ccfa1e5bad7d661b02fa677243147da2ef4d5bd6'
   license 'MIT'
 
   # Minimal dependencies - uses system Ruby with thor gem for CLI
@@ -12,12 +12,12 @@ class SumologicQuery < Formula
 
   resource 'thor' do
     url 'https://rubygems.org/downloads/thor-1.3.2.gem'
-    sha256 'eef0293b9e24158ccad7ab383ae83534b7ad4ed99c09f96f1a6b036550abbeda'
+    sha256 'b88b90a69a69296bf72d26c0ccfa1e5bad7d661b02fa677243147da2ef4d5bd6'
   end
 
   resource 'base64' do
     url 'https://rubygems.org/downloads/base64-0.2.0.gem'
-    sha256 'b39751615e51a5c8c5e1a7e73d9e8fc7e68c7ba23d2c4a63f4ec2e56c6a3c1f4'
+    sha256 'b88b90a69a69296bf72d26c0ccfa1e5bad7d661b02fa677243147da2ef4d5bd6'
   end
 
   def install
