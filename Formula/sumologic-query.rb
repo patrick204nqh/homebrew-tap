@@ -7,8 +7,9 @@ class SumologicQuery < Formula
   sha256 'b88b90a69a69296bf72d26c0ccfa1e5bad7d661b02fa677243147da2ef4d5bd6'
   license 'MIT'
 
-  # Minimal dependencies - uses system Ruby with thor gem for CLI
-  depends_on 'ruby' => :build
+  # Minimal dependencies - uses system Ruby (macOS includes Ruby 2.6+)
+  # On Linux, Homebrew will install Ruby if not present
+  uses_from_macos 'ruby', since: :catalina
 
   resource 'thor' do
     url 'https://rubygems.org/downloads/thor-1.3.2.gem'
@@ -17,7 +18,7 @@ class SumologicQuery < Formula
 
   resource 'base64' do
     url 'https://rubygems.org/downloads/base64-0.2.0.gem'
-    sha256 'b39751615e51a5c8c5e1a7e73d9e8fc7e68c7ba23d2c4a63f4ec2e56c6a3c1f4'
+    sha256 '0f25e9b21a02a0cc0cea8ef92b2041035d39350946e8789c562b2d1a3da01507'
   end
 
   def install
