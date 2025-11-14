@@ -29,9 +29,10 @@ class SumologicQuery < Formula
       system 'gem', 'install', r.cached_download, '--no-document', '--install-dir', libexec
     end
 
-    # Install library files
+    # Install library files and binary
     libexec.install Dir['lib/*']
-    libexec.install 'bin/sumo-query'
+    (libexec / 'bin').mkpath
+    (libexec / 'bin').install 'bin/sumo-query'
 
     # Create wrapper script that sets up GEM_HOME and loads dependencies
     (bin / 'sumo-query').write_env_script(libexec / 'bin/sumo-query', GEM_HOME: libexec, GEM_PATH: libexec)
