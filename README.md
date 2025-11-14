@@ -22,7 +22,10 @@ brew install patrick204nqh/tap/<formula-name>
 
 ## Current Formulae
 
-- **sumologic-query** - Lightweight Ruby CLI for querying Sumo Logic logs
+- **sumologic-query** - Lightweight Ruby CLI for querying Sumo Logic logs and managing collectors
+  - Search logs with automatic pagination
+  - List collectors and sources via Collector Management API
+  - Thor-based command structure
 
 ## Documentation
 
