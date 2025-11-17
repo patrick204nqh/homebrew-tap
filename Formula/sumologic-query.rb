@@ -3,8 +3,8 @@
 class SumologicQuery < Formula
   desc 'Lightweight Ruby CLI for querying Sumo Logic logs quickly'
   homepage 'https://github.com/patrick204nqh/sumologic-query'
-  url 'https://github.com/patrick204nqh/sumologic-query/archive/refs/tags/v1.1.1.tar.gz'
-  sha256 'b88b90a69a69296bf72d26c0ccfa1e5bad7d661b02fa677243147da2ef4d5bd6'
+  url 'https://github.com/patrick204nqh/sumologic-query/archive/refs/tags/v1.3.2.tar.gz'
+  sha256 'f99e01b99cb7e70fdbff9115b198459de18ecc0fc58f663ba238fec96901eb4d'
   license 'MIT'
 
   # Minimal dependencies - uses system Ruby (macOS includes Ruby 2.6+)
