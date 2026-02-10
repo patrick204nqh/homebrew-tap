@@ -28,16 +28,24 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@master
 
+      - name: Tap local repo
+        run: |
+          # Link the checkout as a tap so brew can find the formulas by name
+          mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
+          ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
+
       - name: Audit formulas
         run: |
           for formula in Formula/*.rb; do
-            echo "Auditing $(basename "$formula")..."
-            brew audit --strict "$formula"
+            name=$(basename "$formula" .rb)
+            echo "Auditing $name..."
+            brew audit --strict "patrick204nqh/tap/$name"
           done
 
       - name: Check formula style
         run: |
           for formula in Formula/*.rb; do
-            echo "Checking style for $(basename "$formula")..."
-            brew style "$formula"
+            name=$(basename "$formula" .rb)
+            echo "Checking style for $name..."
+            brew style "patrick204nqh/tap/$name"
           done
