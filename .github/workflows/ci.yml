@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Run RuboCop
+        run: bundle exec rubocop
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Audit formulas
+        run: |
+          for formula in Formula/*.rb; do
+            echo "Auditing $(basename "$formula")..."
+            brew audit --strict "$formula"
+          done
+
+      - name: Check formula style
+        run: |
+          for formula in Formula/*.rb; do
+            echo "Checking style for $(basename "$formula")..."
+            brew style "$formula"
+          done

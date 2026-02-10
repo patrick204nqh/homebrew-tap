@@ -1,2 +1,19 @@
 .DS_Store
 Thumbs.db
+
+# Editor temp files
+*.swp
+*.swo
+*~
+
+# Secrets
+.envrc
+
+# Dev tooling
+.ruby-lsp/
+
+# Dev dependencies
+Gemfile.lock
+
+# Build artifacts
+tarball.tar.gz
