@@ -38,14 +38,6 @@ class SumologicQuery < Formula
     (bin / "sumo-query").write_env_script(libexec / "bin/sumo-query", GEM_HOME: libexec, GEM_PATH: libexec)
   end
 
-  test do
-    # Test that the binary exists and shows help
-    assert_match "Commands:", shell_output("#{bin}/sumo-query help")
-    assert_match "search", shell_output("#{bin}/sumo-query help")
-    assert_match "list-collectors", shell_output("#{bin}/sumo-query help")
-    assert_match "list-sources", shell_output("#{bin}/sumo-query help")
-  end
-
   def caveats
     <<~EOS
       Set up Sumo Logic API credentials:
@@ -59,5 +51,13 @@ class SumologicQuery < Formula
       View commands:
         sumo-query help
     EOS
+  end
+
+  test do
+    # Test that the binary exists and shows help
+    assert_match "Commands:", shell_output("#{bin}/sumo-query help")
+    assert_match "search", shell_output("#{bin}/sumo-query help")
+    assert_match "list-collectors", shell_output("#{bin}/sumo-query help")
+    assert_match "list-sources", shell_output("#{bin}/sumo-query help")
   end
 end
