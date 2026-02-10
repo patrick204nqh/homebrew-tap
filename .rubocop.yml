@@ -1,0 +1,42 @@
+AllCops:
+  TargetRubyVersion: 3.4
+  NewCops: enable
+  SuggestExtensions: false
+  Include:
+    - "Formula/**/*.rb"
+  Exclude:
+    - "vendor/**/*"
+
+# Homebrew formulas use double quotes by convention
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+# Homebrew formulas are inherently long
+Metrics/MethodLength:
+  Enabled: false
+
+Metrics/ClassLength:
+  Enabled: false
+
+# frozen_string_literal is already set in formulas
+Style/FrozenStringLiteralComment:
+  EnforcedStyle: always
+
+# Homebrew DSL methods don't follow normal naming
+Naming/MethodName:
+  Enabled: false
+
+# Homebrew formulas don't need class documentation
+Style/Documentation:
+  Enabled: false
+
+# Homebrew formulas use complex install methods
+Metrics/AbcSize:
+  Enabled: false
+
+# EOS is the standard Homebrew heredoc delimiter
+Naming/HeredocDelimiterNaming:
+  Enabled: false

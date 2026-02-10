@@ -45,7 +45,7 @@ BEGIN { url_updated = 0; sha_updated = 0 }
 
 # Update SHA256 (only first occurrence, before resource blocks)
 !in_resource && /sha256/ && sha_updated == 0 {
-  sub(/sha256 '\''[^'\'']+'\''/, "sha256 '\''" sha "'\''")
+  sub(/sha256 "[^"]+"/, "sha256 \"" sha "\"")
   sha_updated = 1
 }
 

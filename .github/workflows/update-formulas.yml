@@ -4,10 +4,20 @@ on:
   schedule:
     # Run weekly on Monday at 9 AM UTC
     - cron: '0 9 * * 1'
+  repository_dispatch:
+    types: [formula-update]
   workflow_dispatch:
     inputs:
       formula:
         description: 'Specific formula to update (leave empty for all)'
+        required: false
+        type: string
+      version:
+        description: 'Specific version to set (e.g. 1.4.0). Requires formula.'
+        required: false
+        type: string
+      sha256:
+        description: 'SHA256 for the version tarball. Requires version.'
         required: false
         type: string
 
@@ -23,16 +33,32 @@ jobs:
 
       - name: Check for updates
         id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Array to store formulas with updates
           updates='[]'
+
+          # If called via repository_dispatch, extract payload
+          dispatch_formula="${{ github.event.client_payload.formula || '' }}"
+          dispatch_version="${{ github.event.client_payload.version || '' }}"
+          dispatch_sha256="${{ github.event.client_payload.sha256 || '' }}"
+
+          # workflow_dispatch inputs take priority
+          input_formula="${{ inputs.formula || '' }}"
+          input_version="${{ inputs.version || '' }}"
+          input_sha256="${{ inputs.sha256 || '' }}"
+
+          target_formula="${input_formula:-$dispatch_formula}"
+          target_version="${input_version:-$dispatch_version}"
+          target_sha256="${input_sha256:-$dispatch_sha256}"
 
           # Check each formula
           for formula in Formula/*.rb; do
             formula_name=$(basename "$formula" .rb)
 
             # Skip if specific formula requested and this isn't it
-            if [ -n "${{ inputs.formula }}" ] && [ "$formula_name" != "${{ inputs.formula }}" ]; then
+            if [ -n "$target_formula" ] && [ "$formula_name" != "$target_formula" ]; then
               continue
             fi
 
@@ -52,9 +78,14 @@ jobs:
             echo "Current version: $current_version"
             echo "Repository: $repo_url"
 
-            # Fetch latest release from GitHub API
-            latest_release=$(curl -s "https://api.github.com/repos/$repo_url/releases/latest")
-            latest_version=$(echo "$latest_release" | jq -r '.tag_name' | sed 's/^v//')
+            # Use provided version or fetch latest from GitHub API
+            if [ -n "$target_version" ]; then
+              latest_version="$target_version"
+            else
+              latest_release=$(curl -sf -H "Authorization: token $GH_TOKEN" \
+                "https://api.github.com/repos/$repo_url/releases/latest")
+              latest_version=$(echo "$latest_release" | jq -r '.tag_name' | sed 's/^v//')
+            fi
 
             if [ "$latest_version" = "null" ] || [ -z "$latest_version" ]; then
               echo "No releases found for $formula_name"
@@ -67,12 +98,15 @@ jobs:
             if [ "$current_version" != "$latest_version" ]; then
               echo "Update available: $current_version -> $latest_version"
 
-              # Add to updates array
-              updates=$(echo "$updates" | jq --arg name "$formula_name" \
+              # Build update entry; include sha256 override if provided
+              entry=$(jq -n --arg name "$formula_name" \
                 --arg repo "$repo_url" \
                 --arg current "$current_version" \
                 --arg latest "$latest_version" \
-                '. += [{"name": $name, "repo": $repo, "current": $current, "latest": $latest}]')
+                --arg sha "$target_sha256" \
+                '{name: $name, repo: $repo, current: $current, latest: $latest, sha256_override: $sha}')
+
+              updates=$(echo "$updates" | jq --argjson e "$entry" '. += [$e]')
             else
               echo "Already up to date"
             fi
@@ -106,15 +140,22 @@ jobs:
           formula_name="${{ matrix.formula.name }}"
           repo="${{ matrix.formula.repo }}"
           latest_version="${{ matrix.formula.latest }}"
+          sha256_override="${{ matrix.formula.sha256_override }}"
 
           echo "Updating $formula_name to v$latest_version"
 
-          # Download tarball
-          tarball_url="https://github.com/$repo/archive/refs/tags/v${latest_version}.tar.gz"
-          wget "$tarball_url" -O tarball.tar.gz
+          if [ -n "$sha256_override" ]; then
+            sha256="$sha256_override"
+          else
+            # Download tarball
+            tarball_url="https://github.com/$repo/archive/refs/tags/v${latest_version}.tar.gz"
+            wget -q "$tarball_url" -O tarball.tar.gz
 
-          # Calculate SHA256
-          sha256=$(shasum -a 256 tarball.tar.gz | cut -d' ' -f1)
+            # Calculate SHA256
+            sha256=$(sha256sum tarball.tar.gz | cut -d' ' -f1)
+            rm -f tarball.tar.gz
+          fi
+
           echo "SHA256: $sha256"
 
           # Update formula using script (preserves gem resource SHA256 hashes)
@@ -127,7 +168,19 @@ jobs:
           # Show changes
           git diff "Formula/${formula_name}.rb"
 
+      - name: Check for changes
+        id: changes
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected, skipping PR creation."
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Pull Request
+        if: steps.changes.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -141,19 +194,19 @@ jobs:
           delete-branch: true
           title: Update ${{ matrix.formula.name }} to v${{ matrix.formula.latest }}
           body: |
-            ## 🔄 Formula Update
+            ## Formula Update
 
             Auto-detected update for **${{ matrix.formula.name }}**.
 
             ### Changes
-            - ⬆️ Update from `v${{ matrix.formula.current }}` to `v${{ matrix.formula.latest }}`
-            - 🔐 Update SHA256 checksum
-            - 🔗 Update download URL
+            - Update from `v${{ matrix.formula.current }}` to `v${{ matrix.formula.latest }}`
+            - Update SHA256 checksum
+            - Update download URL
 
             ### Links
-            - 📦 [GitHub Repository](https://github.com/${{ matrix.formula.repo }})
-            - 📝 [Release Notes](https://github.com/${{ matrix.formula.repo }}/releases/tag/v${{ matrix.formula.latest }})
-            - 📖 [Changelog](https://github.com/${{ matrix.formula.repo }}/blob/main/CHANGELOG.md)
+            - [GitHub Repository](https://github.com/${{ matrix.formula.repo }})
+            - [Release Notes](https://github.com/${{ matrix.formula.repo }}/releases/tag/v${{ matrix.formula.latest }})
+            - [Changelog](https://github.com/${{ matrix.formula.repo }}/blob/main/CHANGELOG.md)
 
             ### Testing
 
@@ -167,7 +220,7 @@ jobs:
 
             ---
 
-            🤖 *Auto-generated by [update-formulas workflow](https://github.com/patrick204nqh/homebrew-tap/actions)*
+            *Auto-generated by [update-formulas workflow](https://github.com/patrick204nqh/homebrew-tap/actions)*
           labels: |
             automated
             formula-update

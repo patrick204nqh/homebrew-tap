@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Run RuboCop
+        run: bundle exec rubocop
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Tap local repo
+        run: |
+          # Link the checkout as a tap so brew can find the formulas by name
+          mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
+          ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
+
+      - name: Audit formulas
+        run: |
+          for formula in Formula/*.rb; do
+            name=$(basename "$formula" .rb)
+            echo "Auditing $name..."
+            brew audit --strict "patrick204nqh/tap/$name"
+          done
+
+      - name: Check formula style
+        run: |
+          for formula in Formula/*.rb; do
+            name=$(basename "$formula" .rb)
+            echo "Checking style for $name..."
+            brew style "patrick204nqh/tap/$name"
+          done

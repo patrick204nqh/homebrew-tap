@@ -1,49 +1,49 @@
 # frozen_string_literal: true
 
 class SumologicQuery < Formula
-  desc 'Lightweight Ruby CLI for querying Sumo Logic logs quickly'
-  homepage 'https://github.com/patrick204nqh/sumologic-query'
-  url 'https://github.com/patrick204nqh/sumologic-query/archive/refs/tags/v1.3.5.tar.gz'
-  sha256 'f7555c91995d5ac1d2f26655043c800e1e6f5e6e682a6c5a6461c11e424cfd79'
-  license 'MIT'
+  desc "Lightweight Ruby CLI for querying Sumo Logic logs quickly"
+  homepage "https://github.com/patrick204nqh/sumologic-query"
+  url "https://github.com/patrick204nqh/sumologic-query/archive/refs/tags/v1.3.5.tar.gz"
+  sha256 "f7555c91995d5ac1d2f26655043c800e1e6f5e6e682a6c5a6461c11e424cfd79"
+  license "MIT"
 
   # Minimal dependencies - uses system Ruby (macOS includes Ruby 2.6+)
   # On Linux, Homebrew will install Ruby if not present
-  uses_from_macos 'ruby', since: :catalina
+  uses_from_macos "ruby", since: :catalina
 
-  resource 'thor' do
-    url 'https://rubygems.org/downloads/thor-1.3.2.gem'
-    sha256 'eef0293b9e24158ccad7ab383ae83534b7ad4ed99c09f96f1a6b036550abbeda'
+  resource "thor" do
+    url "https://rubygems.org/downloads/thor-1.3.2.gem"
+    sha256 "eef0293b9e24158ccad7ab383ae83534b7ad4ed99c09f96f1a6b036550abbeda"
   end
 
-  resource 'base64' do
-    url 'https://rubygems.org/downloads/base64-0.2.0.gem'
-    sha256 '0f25e9b21a02a0cc0cea8ef92b2041035d39350946e8789c562b2d1a3da01507'
+  resource "base64" do
+    url "https://rubygems.org/downloads/base64-0.2.0.gem"
+    sha256 "0f25e9b21a02a0cc0cea8ef92b2041035d39350946e8789c562b2d1a3da01507"
   end
 
   def install
     # Install gem dependencies to libexec
-    ENV['GEM_HOME'] = libexec
+    ENV["GEM_HOME"] = libexec
     resources.each do |r|
       r.fetch
-      system 'gem', 'install', r.cached_download, '--no-document', '--install-dir', libexec
+      system "gem", "install", r.cached_download, "--no-document", "--install-dir", libexec
     end
 
     # Install library files and binary
-    libexec.install Dir['lib/*']
-    (libexec / 'bin').mkpath
-    (libexec / 'bin').install 'bin/sumo-query'
+    libexec.install Dir["lib/*"]
+    (libexec / "bin").mkpath
+    (libexec / "bin").install "bin/sumo-query"
 
     # Create wrapper script that sets up GEM_HOME and loads dependencies
-    (bin / 'sumo-query').write_env_script(libexec / 'bin/sumo-query', GEM_HOME: libexec, GEM_PATH: libexec)
+    (bin / "sumo-query").write_env_script(libexec / "bin/sumo-query", GEM_HOME: libexec, GEM_PATH: libexec)
   end
 
   test do
     # Test that the binary exists and shows help
-    assert_match 'Commands:', shell_output("#{bin}/sumo-query help")
-    assert_match 'search', shell_output("#{bin}/sumo-query help")
-    assert_match 'list-collectors', shell_output("#{bin}/sumo-query help")
-    assert_match 'list-sources', shell_output("#{bin}/sumo-query help")
+    assert_match "Commands:", shell_output("#{bin}/sumo-query help")
+    assert_match "search", shell_output("#{bin}/sumo-query help")
+    assert_match "list-collectors", shell_output("#{bin}/sumo-query help")
+    assert_match "list-sources", shell_output("#{bin}/sumo-query help")
   end
 
   def caveats
