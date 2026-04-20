@@ -17,3 +17,8 @@ Gemfile.lock
 
 # Build artifacts
 tarball.tar.gz
+*.bottle*.tar.gz
+*.bottle*.json
+
+# Bottle directory (artifacts live in GitHub Releases, not git)
+bottles/
