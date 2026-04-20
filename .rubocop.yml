@@ -20,7 +20,7 @@ Layout/LineLength:
 
 # Match brew style's table alignment for multi-line hashes
 Layout/HashAlignment:
-  EnforcedStyle: table
+  EnforcedColonStyle: table
 
 # Match brew style: trailing comma required in multiline hashes/arrays
 Style/TrailingCommaInHashLiteral:
