@@ -111,5 +111,5 @@ jobs:
           git add "Formula/${{ matrix.formula }}.rb"
           if ! git diff --cached --quiet; then
             git commit -m "bottles: ${{ matrix.formula }} v${{ env.VERSION }} [skip ci]"
-            git push
+            git push origin HEAD:main
           fi
