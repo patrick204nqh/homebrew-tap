@@ -14,6 +14,14 @@ Style/StringLiterals:
 Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
 
+# sha256 bottle lines exceed 120 chars by design
+Layout/LineLength:
+  Max: 160
+
+# Match brew style's table alignment for multi-line hashes
+Layout/HashAlignment:
+  EnforcedStyle: table
+
 # Homebrew formulas are inherently long
 Metrics/MethodLength:
   Enabled: false
