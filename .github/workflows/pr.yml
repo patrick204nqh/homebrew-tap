@@ -16,42 +16,56 @@ jobs:
       - name: Run RuboCop
         run: bundle exec rubocop
 
+  detect-formulas:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.detect.outputs.changed }}
+      all: ${{ steps.detect.outputs.all }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect changed formulas
+        id: detect
+        run: |
+          changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD \
+            | grep '^Formula/.*\.rb$' \
+            | xargs -I{} basename {} .rb \
+            | jq -R . | jq -sc .)
+          [ "$changed" = "[]" ] && changed="null"
+
+          all=$(ls Formula/*.rb | xargs -I{} basename {} .rb | jq -R . | jq -sc .)
+
+          echo "changed=$changed" >> $GITHUB_OUTPUT
+          echo "all=$all" >> $GITHUB_OUTPUT
+          echo "Changed formulas: $changed"
+
   audit:
+    needs: detect-formulas
+    if: needs.detect-formulas.outputs.changed != 'null'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
-      - name: Audit and style-check formulas
+      - name: Audit and style-check changed formulas
         run: |
           mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
           ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
-          for formula in Formula/*.rb; do
-            name=$(basename "$formula" .rb)
+          echo '${{ needs.detect-formulas.outputs.changed }}' | jq -r '.[]' | while read -r name; do
             echo "--- $name ---"
             brew audit --strict "patrick204nqh/tap/$name"
             brew style "patrick204nqh/tap/$name"
           done
 
-  get-formulas:
-    runs-on: ubuntu-latest
-    outputs:
-      formulas: ${{ steps.list.outputs.formulas }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: List formulas
-        id: list
-        run: |
-          formulas=$(ls Formula/*.rb | xargs -I{} basename {} .rb | jq -R . | jq -sc .)
-          echo "formulas=$formulas" >> $GITHUB_OUTPUT
-
   install:
-    needs: [lint, audit, get-formulas]
+    needs: [lint, audit, detect-formulas]
+    if: needs.detect-formulas.outputs.changed != 'null'
     runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
-        formula: ${{ fromJson(needs.get-formulas.outputs.formulas) }}
+        formula: ${{ fromJson(needs.detect-formulas.outputs.changed) }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Homebrew

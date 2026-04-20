@@ -34,27 +34,38 @@ jobs:
             brew style "patrick204nqh/tap/$name"
           done
 
-  get-formulas:
+  detect-formulas:
     runs-on: ubuntu-latest
     outputs:
-      formulas: ${{ steps.list.outputs.formulas }}
+      formulas: ${{ steps.detect.outputs.formulas }}
     steps:
       - uses: actions/checkout@v4
-      - name: List formulas
-        id: list
+        with:
+          fetch-depth: 2
+      - name: Detect changed formulas
+        id: detect
         run: |
-          formulas=$(ls Formula/*.rb | xargs -I{} basename {} .rb | jq -R . | jq -sc .)
-          echo "formulas=$formulas" >> $GITHUB_OUTPUT
+          changed=$(git diff --name-only HEAD~1 HEAD \
+            | grep '^Formula/.*\.rb$' \
+            | xargs -I{} basename {} .rb \
+            | jq -R . | jq -sc .)
+          # Fall back to all formulas on workflow_dispatch or if detection fails
+          if [ "$changed" = "[]" ] || [ "$changed" = "null" ]; then
+            changed=$(ls Formula/*.rb | xargs -I{} basename {} .rb | jq -R . | jq -sc .)
+            echo "No formula changes detected, falling back to all formulas"
+          fi
+          echo "formulas=$changed" >> $GITHUB_OUTPUT
+          echo "Formulas to build: $changed"
 
   build-and-publish:
-    needs: [lint, audit, get-formulas]
+    needs: [lint, audit, detect-formulas]
     runs-on: macos-latest
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
-        formula: ${{ fromJson(needs.get-formulas.outputs.formulas) }}
+        formula: ${{ fromJson(needs.detect-formulas.outputs.formulas) }}
     steps:
       - uses: actions/checkout@v4
 
