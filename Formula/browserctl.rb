@@ -81,19 +81,11 @@ class Browserctl < Formula
   def install
     ENV["GEM_HOME"] = libexec
     resources.each do |r|
-      r.fetch
-      system "gem", "install", r.cached_download,
-             "--no-document", "--ignore-dependencies", "--install-dir", libexec
+      r.stage { system "gem", "install", r.cached_download, "--no-document", "--ignore-dependencies", "--install-dir", libexec }
     end
 
-    # Preserve lib/ so the bin scripts can resolve ../lib relative to their location
     libexec.install "lib"
     (libexec / "bin").install "bin/browserctl", "bin/browserd"
-
-    # Pin shebang to Homebrew's Ruby so native gem extensions are ABI-compatible
-    ruby = Formula["ruby"].opt_bin / "ruby"
-    inreplace libexec / "bin/browserctl", /\A#!.*/, "#!#{ruby}"
-    inreplace libexec / "bin/browserd", /\A#!.*/, "#!#{ruby}"
 
     env = { GEM_HOME: libexec, GEM_PATH: libexec }
     (bin / "browserctl").write_env_script(libexec / "bin/browserctl", env)

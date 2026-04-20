@@ -10,7 +10,7 @@ class SumologicQuery < Formula
   bottle do
     root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/sumologic-query-1.4.2"
     rebuild 1
-    sha256 cellar: :any_skip_relocation,
+    sha256 cellar: :any,
            arm64_sequoia: "0f20c77faf2cf5e9788c2aa0aefe1fb461335435c45932f080f5c17ee46c6033"
   end
 
@@ -29,18 +29,11 @@ class SumologicQuery < Formula
   def install
     ENV["GEM_HOME"] = libexec
     resources.each do |r|
-      r.fetch
-      system "gem", "install", r.cached_download,
-             "--no-document", "--ignore-dependencies", "--install-dir", libexec
+      r.stage { system "gem", "install", r.cached_download, "--no-document", "--ignore-dependencies", "--install-dir", libexec }
     end
 
-    # Preserve lib/ so the bin script can resolve ../lib relative to its location
     libexec.install "lib"
     (libexec / "bin").install "bin/sumo-query"
-
-    # Pin shebang to Homebrew's Ruby so native gem extensions are ABI-compatible
-    inreplace libexec / "bin/sumo-query", /\A#!.*/, "#!#{Formula["ruby"].opt_bin}/ruby"
-
     (bin / "sumo-query").write_env_script(libexec / "bin/sumo-query", GEM_HOME: libexec, GEM_PATH: libexec)
   end
 
