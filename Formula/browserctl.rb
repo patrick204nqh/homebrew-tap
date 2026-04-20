@@ -87,13 +87,14 @@ class Browserctl < Formula
 
     # Include Ruby's default gem path so bundled gems (e.g. racc) are found
     # even when native extensions were compiled for a different darwin minor version.
-    ruby_gem_path = Formula["ruby"].opt_lib/"ruby/gems"/Utils.safe_popen_read(
-      Formula["ruby"].opt_bin/"ruby", "-e", "puts RbConfig::CONFIG['ruby_version']"
+    ruby_version = Utils.safe_popen_read(
+      Formula["ruby"].opt_bin / "ruby", "-e", "puts RbConfig::CONFIG['ruby_version']"
     ).chomp
+    ruby_gem_path = Formula["ruby"].opt_lib / "ruby/gems" / ruby_version
     env = {
       GEM_HOME: libexec,
       GEM_PATH: "#{libexec}#{File::PATH_SEPARATOR}#{ruby_gem_path}",
-      PATH:     "#{Formula["ruby"].opt_bin}#{File::PATH_SEPARATOR}#{ENV.fetch("PATH", nil)}",
+      PATH: "#{Formula["ruby"].opt_bin}#{File::PATH_SEPARATOR}#{ENV.fetch("PATH", nil)}"
     }
     (bin / "browserctl").write_env_script(libexec / "bin/browserctl", env)
     (bin / "browserd").write_env_script(libexec / "bin/browserd", env)
