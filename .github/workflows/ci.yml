@@ -62,8 +62,6 @@ jobs:
 
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
-        with:
-          cache: true
 
       - name: Tap local repo
         run: |
@@ -90,9 +88,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bottle-${{ matrix.formula }}
-          path: |
-            *.bottle.tar.gz
-            *.bottle.json
+          path: "*.bottle*.tar.gz\n*.bottle*.json"
 
   publish-bottles:
     needs: [get-formulas, install-test]
@@ -120,6 +116,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bottle-${{ matrix.formula }}
+          path: bottles/
 
       - name: Get formula version
         id: meta
@@ -139,10 +136,10 @@ jobs:
               --title "${{ matrix.formula }} v${{ steps.meta.outputs.version }}" \
               --notes "Pre-built bottles for \`${{ matrix.formula }}\` v${{ steps.meta.outputs.version }}"
           fi
-          gh release upload "$tag" *.bottle.tar.gz --clobber
+          gh release upload "$tag" bottles/*.bottle*.tar.gz --clobber
 
       - name: Merge bottle JSON into formula
-        run: brew bottle --merge --write --no-commit *.bottle.json
+        run: brew bottle --merge --write --no-commit bottles/*.bottle*.json
 
       - name: Open PR with bottle blocks
         uses: peter-evans/create-pull-request@v6
