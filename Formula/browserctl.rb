@@ -9,8 +9,8 @@ class Browserctl < Formula
 
   bottle do
     root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/browserctl-0.2.1"
-    rebuild 3
-    sha256 cellar: :any, arm64_sequoia: "68feb79a6f7f90658a0096febdd6acde6edcbd182aae9475bf867e3d5a970383"
+    rebuild 4
+    sha256 cellar: :any, arm64_sequoia: "0da889d3cb075a260f183fe3d5df95272fb6beb4e64b04aa8440f6947f50b823"
   end
 
   depends_on "ruby"
