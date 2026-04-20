@@ -140,6 +140,20 @@ jobs:
           fi
           gh release upload "$tag" bottles/*.bottle*.tar.gz --clobber
 
+      - name: Delete stale bottle releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          current_tag="${{ steps.meta.outputs.tag }}"
+          gh release list --limit 100 --json tagName \
+            | jq -r '.[].tagName' \
+            | grep "^${{ matrix.formula }}-" \
+            | grep -v "^${current_tag}$" \
+            | while read -r old_tag; do
+                echo "Deleting stale release: $old_tag"
+                gh release delete "$old_tag" --yes --cleanup-tag || true
+              done
+
       - name: Merge bottle JSON into formula
         run: brew bottle --merge --write --no-commit bottles/*.bottle*.json
 
