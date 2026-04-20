@@ -88,7 +88,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bottle-${{ matrix.formula }}
-          path: "*.bottle*.tar.gz\n*.bottle*.json"
+          path: |
+            *.bottle*.tar.gz
+            *.bottle*.json
 
   publish-bottles:
     needs: [get-formulas, install-test]

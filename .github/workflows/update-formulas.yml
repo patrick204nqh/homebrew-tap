@@ -118,6 +118,7 @@ jobs:
       contents: write
       pull-requests: write
     strategy:
+      fail-fast: false
       matrix:
         formula: ${{ fromJson(needs.check-updates.outputs.updates) }}
     steps:
@@ -201,7 +202,7 @@ jobs:
             Test this formula before merging:
             ```bash
             brew tap patrick204nqh/tap
-            brew install --build-from-source patrick204nqh/tap/${{ matrix.formula.name }}
+            brew install --build-bottle patrick204nqh/tap/${{ matrix.formula.name }}
             brew test ${{ matrix.formula.name }}
             brew audit --strict ${{ matrix.formula.name }}
             ```

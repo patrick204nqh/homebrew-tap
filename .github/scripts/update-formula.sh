@@ -30,20 +30,27 @@ echo "Repo: $REPO"
 TMP_FILE="${FORMULA_FILE}.tmp"
 cp "$FORMULA_FILE" "$TMP_FILE"
 
-# Use awk to update only the FIRST url and sha256 (before any 'resource' blocks)
+# Use awk to:
+#   1. Strip any existing bottle do...end block (stale after a version bump)
+#   2. Update the first url and sha256 (before any resource blocks)
 awk -v version="$LATEST_VERSION" -v sha="$NEW_SHA256" -v repo="$REPO" '
-BEGIN { url_updated = 0; sha_updated = 0 }
+BEGIN { url_updated = 0; sha_updated = 0; in_bottle = 0; in_resource = 0 }
 
-# Stop processing url/sha after we hit a resource block
+# Skip stale bottle block entirely
+/^[[:space:]]*bottle do/ { in_bottle = 1; next }
+in_bottle && /^[[:space:]]*end[[:space:]]*$/ { in_bottle = 0; next }
+in_bottle { next }
+
+# Stop updating url/sha once inside a resource block
 /^[[:space:]]*resource / { in_resource = 1 }
 
-# Update URL (only first occurrence, before resource blocks)
+# Update URL (first occurrence, before resource blocks)
 !in_resource && /url.*github\.com.*archive\/refs\/tags\/v/ && url_updated == 0 {
   sub(/archive\/refs\/tags\/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz/, "archive/refs/tags/v" version ".tar.gz")
   url_updated = 1
 }
 
-# Update SHA256 (only first occurrence, before resource blocks)
+# Update SHA256 (first occurrence, before resource blocks)
 !in_resource && /sha256/ && sha_updated == 0 {
   sub(/sha256 "[^"]+"/, "sha256 \"" sha "\"")
   sha_updated = 1
