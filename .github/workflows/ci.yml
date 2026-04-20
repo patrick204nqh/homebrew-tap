@@ -5,18 +5,17 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.4"
           bundler-cache: true
-
       - name: Run RuboCop
         run: bundle exec rubocop
 
@@ -24,28 +23,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
-
       - name: Tap local repo
         run: |
           mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
           ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
-
-      - name: Audit formulas
+      - name: Audit and style-check formulas
         run: |
           for formula in Formula/*.rb; do
             name=$(basename "$formula" .rb)
-            echo "Auditing $name..."
+            echo "--- $name ---"
             brew audit --strict "patrick204nqh/tap/$name"
-          done
-
-      - name: Check formula style
-        run: |
-          for formula in Formula/*.rb; do
-            name=$(basename "$formula" .rb)
-            echo "Checking style for $name..."
             brew style "patrick204nqh/tap/$name"
           done
 
@@ -55,7 +44,6 @@ jobs:
       formulas: ${{ steps.list.outputs.formulas }}
     steps:
       - uses: actions/checkout@v4
-
       - name: List formulas
         id: list
         run: |
@@ -87,3 +75,103 @@ jobs:
 
       - name: Run formula tests
         run: brew test "patrick204nqh/tap/${{ matrix.formula }}"
+
+      - name: Build bottle
+        if: github.ref == 'refs/heads/main'
+        run: |
+          version=$(brew info --json "patrick204nqh/tap/${{ matrix.formula }}" \
+            | jq -r '.[0].versions.stable')
+          brew bottle --json \
+            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/${{ matrix.formula }}-${version}" \
+            "patrick204nqh/tap/${{ matrix.formula }}"
+
+      - name: Upload bottle artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bottle-${{ matrix.formula }}
+          path: |
+            *.bottle.tar.gz
+            *.bottle.json
+
+  publish-bottles:
+    needs: [get-formulas, install-test]
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        formula: ${{ fromJson(needs.get-formulas.outputs.formulas) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+
+      - name: Tap local repo
+        run: |
+          mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
+          ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
+
+      - name: Download bottle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bottle-${{ matrix.formula }}
+
+      - name: Get formula version
+        id: meta
+        run: |
+          version=$(brew info --json "patrick204nqh/tap/${{ matrix.formula }}" \
+            | jq -r '.[0].versions.stable')
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "tag=${{ matrix.formula }}-${version}" >> $GITHUB_OUTPUT
+
+      - name: Publish bottles to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ steps.meta.outputs.tag }}"
+          if ! gh release view "$tag" &>/dev/null; then
+            gh release create "$tag" \
+              --title "${{ matrix.formula }} v${{ steps.meta.outputs.version }}" \
+              --notes "Pre-built bottles for \`${{ matrix.formula }}\` v${{ steps.meta.outputs.version }}"
+          fi
+          gh release upload "$tag" *.bottle.tar.gz --clobber
+
+      - name: Merge bottle JSON into formula
+        run: brew bottle --merge --write --no-commit *.bottle.json
+
+      - name: Open PR with bottle blocks
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Add bottles for ${{ matrix.formula }} v${{ steps.meta.outputs.version }}"
+          branch: bottles-${{ matrix.formula }}-v${{ steps.meta.outputs.version }}
+          delete-branch: true
+          title: "Add bottles for ${{ matrix.formula }} v${{ steps.meta.outputs.version }}"
+          body: |
+            ## Bottles for ${{ matrix.formula }}
+
+            Adds pre-built bottles so `brew install` downloads a binary instead of building from source.
+
+            | Before | After |
+            |--------|-------|
+            | ~3–5 min (build from source) | ~15–30 sec (binary download) |
+
+            ### Platform
+            - `arm64_sequoia` — Apple Silicon, macOS 15
+
+            ### To test before merging
+            ```bash
+            brew install patrick204nqh/tap/${{ matrix.formula }}
+            brew test patrick204nqh/tap/${{ matrix.formula }}
+            ```
+
+            ---
+            *Auto-generated by [CI workflow](https://github.com/patrick204nqh/homebrew-tap/actions)*
+          labels: |
+            bottles
+            automated
