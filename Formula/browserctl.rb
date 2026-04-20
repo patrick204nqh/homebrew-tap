@@ -7,6 +7,12 @@ class Browserctl < Formula
   sha256 "dfecb6631a05c8220000a5ca995f69b0ee0eca04b052fb7c6b3a91a67756d8c9"
   license "MIT"
 
+  bottle do
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/browserctl-0.3.0"
+    rebuild 1
+    sha256 cellar: :any, arm64_sequoia: "9d532aa16ad895e14423d58bb3b20cd82c6a6202c3fa8c62ad73a7b39f65a691"
+  end
+
   depends_on "ruby"
 
   # nokogiri — precompiled platform gems (avoids needing libxml2/libxslt)
