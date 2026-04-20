@@ -7,6 +7,12 @@ class SumologicQuery < Formula
   sha256 "4282fc7daa74ffd3a4d37bf87447b1282cd3ec7ee4217f63bd17a84592610620"
   license "MIT"
 
+  bottle do
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/sumologic-query-1.4.2"
+    rebuild 1
+    sha256 cellar: :any_skip_relocation, arm64_sequoia: "0f20c77faf2cf5e9788c2aa0aefe1fb461335435c45932f080f5c17ee46c6033"
+  end
+
   depends_on "ruby"
 
   resource "thor" do
