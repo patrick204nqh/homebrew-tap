@@ -3,15 +3,10 @@
 class Browserctl < Formula
   desc "Persistent browser automation daemon and CLI for AI agents"
   homepage "https://github.com/patrick204nqh/browserctl"
-  url "https://github.com/patrick204nqh/browserctl/archive/refs/tags/v0.2.1.tar.gz"
-  sha256 "57299ed461765fad7f2d0287a83c1fc0c947f1b96932266651bbe68c6818d89e"
+  url "https://github.com/patrick204nqh/browserctl/archive/refs/tags/v0.3.0.tar.gz"
+  sha256 "dfecb6631a05c8220000a5ca995f69b0ee0eca04b052fb7c6b3a91a67756d8c9"
   license "MIT"
 
-  bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/browserctl-0.2.1"
-    rebuild 7
-    sha256 cellar: :any, arm64_sequoia: "135ffe387b9356ec236c0a11bdff1038523891b14f91a967531de04270ff5a50"
-  end
 
   depends_on "ruby"
 
