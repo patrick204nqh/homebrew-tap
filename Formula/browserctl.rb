@@ -100,6 +100,30 @@ class Browserctl < Formula
     (bin / "browserd").write_env_script(libexec / "bin/browserd", env)
   end
 
+  def post_install
+    # When a bottle built on an older darwin is poured on a newer one,
+    # native extension .bundles land in the wrong platform directory.
+    # They are binary-compatible within the same Ruby major.minor + arch,
+    # so we symlink the built platform dir to the current one.
+    current_platform = Utils.safe_popen_read(
+      Formula["ruby"].opt_bin / "ruby", "-e", "puts Gem::Platform.local"
+    ).chomp
+    ext_dir = libexec / "extensions"
+    return unless ext_dir.exist?
+    return if (ext_dir / current_platform).exist?
+
+    ext_dir.each_child do |src|
+      next unless src.directory?
+      dst = ext_dir / current_platform
+      dst.mkpath
+      src.each_child do |ver_dir|
+        next unless ver_dir.directory?
+        dst_ver = dst / ver_dir.basename
+        FileUtils.ln_sf ver_dir, dst_ver unless dst_ver.exist?
+      end
+    end
+  end
+
   def caveats
     <<~EOS
       browserctl requires Google Chrome or Chromium to be installed.
