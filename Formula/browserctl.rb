@@ -27,11 +27,6 @@ class Browserctl < Formula
     end
   end
 
-  resource "racc" do
-    url "https://rubygems.org/downloads/racc-1.8.1.gem"
-    sha256 "4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f"
-  end
-
   # ferrum and its transitive deps
   resource "ferrum" do
     url "https://rubygems.org/downloads/ferrum-0.17.2.gem"
@@ -90,7 +85,16 @@ class Browserctl < Formula
     libexec.install "lib"
     (libexec / "bin").install "bin/browserctl", "bin/browserd"
 
-    env = { GEM_HOME: libexec, GEM_PATH: libexec, PATH: "#{Formula["ruby"].opt_bin}#{File::PATH_SEPARATOR}#{ENV.fetch("PATH", nil)}" }
+    # Include Ruby's default gem path so bundled gems (e.g. racc) are found
+    # even when native extensions were compiled for a different darwin minor version.
+    ruby_gem_path = Formula["ruby"].opt_lib/"ruby/gems"/Utils.safe_popen_read(
+      Formula["ruby"].opt_bin/"ruby", "-e", "puts RbConfig::CONFIG['ruby_version']"
+    ).chomp
+    env = {
+      GEM_HOME: libexec,
+      GEM_PATH: "#{libexec}#{File::PATH_SEPARATOR}#{ruby_gem_path}",
+      PATH:     "#{Formula["ruby"].opt_bin}#{File::PATH_SEPARATOR}#{ENV.fetch("PATH", nil)}",
+    }
     (bin / "browserctl").write_env_script(libexec / "bin/browserctl", env)
     (bin / "browserd").write_env_script(libexec / "bin/browserd", env)
   end
