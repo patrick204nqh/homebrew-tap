@@ -34,7 +34,7 @@ cp "$FORMULA_FILE" "$TMP_FILE"
 #   1. Strip any existing bottle do...end block (stale after a version bump)
 #   2. Update the first url and sha256 (before any resource blocks)
 awk -v version="$LATEST_VERSION" -v sha="$NEW_SHA256" -v repo="$REPO" '
-BEGIN { url_updated = 0; sha_updated = 0; in_bottle = 0; in_resource = 0 }
+BEGIN { url_updated = 0; sha_updated = 0; in_bottle = 0; in_resource = 0; prev_blank = 0 }
 
 # Skip stale bottle block entirely
 /^[[:space:]]*bottle do/ { in_bottle = 1; next }
@@ -56,7 +56,9 @@ in_bottle { next }
   sha_updated = 1
 }
 
-{ print }
+# Collapse consecutive blank lines (prevents RuboCop Layout/EmptyLines violations)
+/^[[:space:]]*$/ { if (prev_blank) next; prev_blank = 1; print; next }
+{ prev_blank = 0; print }
 
 END {
   if (url_updated == 0) {
