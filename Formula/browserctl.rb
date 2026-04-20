@@ -90,7 +90,7 @@ class Browserctl < Formula
     libexec.install "lib"
     (libexec / "bin").install "bin/browserctl", "bin/browserd"
 
-    env = { GEM_HOME: libexec, GEM_PATH: libexec, PATH: "#{Formula["ruby"].opt_bin}#{File::PATH_SEPARATOR}#{ENV["PATH"]}" }
+    env = { GEM_HOME: libexec, GEM_PATH: libexec, PATH: "#{Formula["ruby"].opt_bin}#{File::PATH_SEPARATOR}#{ENV.fetch("PATH", nil)}" }
     (bin / "browserctl").write_env_script(libexec / "bin/browserctl", env)
     (bin / "browserd").write_env_script(libexec / "bin/browserd", env)
   end
