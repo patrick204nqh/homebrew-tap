@@ -9,8 +9,8 @@ class SumologicQuery < Formula
 
   bottle do
     root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/sumologic-query-1.4.2"
-    rebuild 4
-    sha256 cellar: :any_skip_relocation, arm64_sequoia: "ebf3925adea358bd7a40b89f2464521d704a2082380406223e5a0ea6fb27d8a1"
+    rebuild 5
+    sha256 cellar: :any_skip_relocation, arm64_sequoia: "309f8f90639ba210fb3b533d84520d62e213546046e4be94e1475220944c762a"
   end
 
   depends_on "ruby"
