@@ -120,6 +120,11 @@ jobs:
               --title "${{ matrix.formula }} v${{ env.VERSION }}" \
               --notes "Pre-built bottles for \`${{ matrix.formula }}\` v${{ env.VERSION }}"
           fi
+          # Delete stale bottle assets (old rebuild numbers) before uploading
+          gh release view "$tag" --json assets --jq '.assets[].name' \
+            | grep '\.bottle' \
+            | grep -v "^${{ env.BOTTLE_FILE }}$" \
+            | xargs -I{} gh release delete-asset "$tag" {} --yes || true
           gh release upload "$tag" "${{ env.BOTTLE_FILE }}" --clobber
 
       - name: Delete stale releases
