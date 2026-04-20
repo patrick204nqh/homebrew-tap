@@ -114,10 +114,12 @@ class Browserctl < Formula
 
     ext_dir.each_child do |src|
       next unless src.directory?
+
       dst = ext_dir / current_platform
       dst.mkpath
       src.each_child do |ver_dir|
         next unless ver_dir.directory?
+
         dst_ver = dst / ver_dir.basename
         FileUtils.ln_sf ver_dir, dst_ver unless dst_ver.exist?
       end
