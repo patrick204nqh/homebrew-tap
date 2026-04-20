@@ -4,8 +4,6 @@ on:
   schedule:
     # Run weekly on Monday at 9 AM UTC
     - cron: '0 9 * * 1'
-  repository_dispatch:
-    types: [formula-update]
   workflow_dispatch:
     inputs:
       formula:
@@ -39,19 +37,9 @@ jobs:
           # Array to store formulas with updates
           updates='[]'
 
-          # If called via repository_dispatch, extract payload
-          dispatch_formula="${{ github.event.client_payload.formula || '' }}"
-          dispatch_version="${{ github.event.client_payload.version || '' }}"
-          dispatch_sha256="${{ github.event.client_payload.sha256 || '' }}"
-
-          # workflow_dispatch inputs take priority
-          input_formula="${{ inputs.formula || '' }}"
-          input_version="${{ inputs.version || '' }}"
-          input_sha256="${{ inputs.sha256 || '' }}"
-
-          target_formula="${input_formula:-$dispatch_formula}"
-          target_version="${input_version:-$dispatch_version}"
-          target_sha256="${input_sha256:-$dispatch_sha256}"
+          target_formula="${{ inputs.formula || '' }}"
+          target_version="${{ inputs.version || '' }}"
+          target_sha256="${{ inputs.sha256 || '' }}"
 
           # Check each formula
           for formula in Formula/*.rb; do

@@ -8,29 +8,42 @@ Homebrew formulas for patrick204nqh's open source projects.
 brew tap patrick204nqh/tap
 ```
 
-## Available Formulae
+## Available formulas
 
-To see all available formulae:
+| Formula | Description |
+|---------|-------------|
+| [sumologic-query](Formula/sumologic-query.rb) | Lightweight Ruby CLI for querying Sumo Logic logs and managing collectors |
+| [browserctl](Formula/browserctl.rb) | Persistent browser automation daemon and CLI for AI agents |
+
+### sumologic-query
+
 ```bash
-brew search patrick204nqh/tap/
+brew install patrick204nqh/tap/sumologic-query
 ```
 
-To install a formula:
+Requires environment variables:
+
 ```bash
-brew install patrick204nqh/tap/<formula-name>
+export SUMO_ACCESS_ID='your_access_id'
+export SUMO_ACCESS_KEY='your_access_key'
+export SUMO_DEPLOYMENT='us2'  # us1, us2 (default), eu, au
 ```
 
-## Current Formulae
+### browserctl
 
-- **sumologic-query** - Lightweight Ruby CLI for querying Sumo Logic logs and managing collectors
-  - Search logs with automatic pagination
-  - List collectors and sources via Collector Management API
-  - Thor-based command structure
+```bash
+brew install patrick204nqh/tap/browserctl
+```
 
-## Documentation
+Requires Google Chrome or Chromium. Start the daemon, then use the CLI:
 
-Each formula links to its respective project repository for detailed documentation.
+```bash
+browserd                              # start daemon
+browserctl goto https://example.com
+browserctl snap                       # AI-friendly DOM snapshot
+browserctl shutdown
+```
 
 ## Contributing
 
-Found a bug or have a suggestion? Open an issue in the respective project repository.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add or update a formula.

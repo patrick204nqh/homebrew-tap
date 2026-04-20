@@ -49,3 +49,28 @@ jobs:
             echo "Checking style for $name..."
             brew style "patrick204nqh/tap/$name"
           done
+
+  install-test:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        formula:
+          - sumologic-query
+          - browserctl
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Tap local repo
+        run: |
+          mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
+          ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
+
+      - name: Install formula
+        run: brew install --build-from-source "patrick204nqh/tap/${{ matrix.formula }}"
+
+      - name: Run formula tests
+        run: brew test "patrick204nqh/tap/${{ matrix.formula }}"
