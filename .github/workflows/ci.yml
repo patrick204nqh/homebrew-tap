@@ -30,7 +30,6 @@ jobs:
 
       - name: Tap local repo
         run: |
-          # Link the checkout as a tap so brew can find the formulas by name
           mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
           ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
 
@@ -50,20 +49,33 @@ jobs:
             brew style "patrick204nqh/tap/$name"
           done
 
+  get-formulas:
+    runs-on: ubuntu-latest
+    outputs:
+      formulas: ${{ steps.list.outputs.formulas }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: List formulas
+        id: list
+        run: |
+          formulas=$(ls Formula/*.rb | xargs -I{} basename {} .rb | jq -R . | jq -sc .)
+          echo "formulas=$formulas" >> $GITHUB_OUTPUT
+
   install-test:
-    needs: [lint, audit]
+    needs: [lint, audit, get-formulas]
     runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
-        formula:
-          - sumologic-query
-          - browserctl
+        formula: ${{ fromJson(needs.get-formulas.outputs.formulas) }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
+        with:
+          cache: true
 
       - name: Tap local repo
         run: |
