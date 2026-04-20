@@ -7,7 +7,6 @@ class Browserctl < Formula
   sha256 "c42ba1dac906b71e8f58c4b3c0ac0d3e90cf48111bd5136d54bc951b37f24b5f"
   license "MIT"
 
-
   depends_on "ruby"
 
   # nokogiri — precompiled platform gems (avoids needing libxml2/libxslt)
