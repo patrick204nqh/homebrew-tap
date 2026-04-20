@@ -3,8 +3,8 @@
 class Browserctl < Formula
   desc "Persistent browser automation daemon and CLI for AI agents"
   homepage "https://github.com/patrick204nqh/browserctl"
-  url "https://github.com/patrick204nqh/browserctl/archive/refs/tags/v0.1.1.tar.gz"
-  sha256 "8a0171370fbcfc813b6bc7e141719b51c1f2233bf09df5c9ebff5b7594b8caa3"
+  url "https://github.com/patrick204nqh/browserctl/archive/refs/tags/v0.2.0.tar.gz"
+  sha256 "1133432946ebe52b12a11a0bf2c43249adcd1da3286256d6e973b151264d9803"
   license "MIT"
 
   depends_on "ruby"
