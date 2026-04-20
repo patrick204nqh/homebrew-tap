@@ -6,15 +6,15 @@
 
 set -euo pipefail
 
-FORMULA_FILE="$1"
-LATEST_VERSION="$2"
-NEW_SHA256="$3"
-REPO="$4"
-
 if [ $# -ne 4 ]; then
   echo "Usage: $0 <formula_file> <version> <sha256> <repo>"
   exit 1
 fi
+
+FORMULA_FILE="$1"
+LATEST_VERSION="$2"
+NEW_SHA256="$3"
+REPO="$4"
 
 if [ ! -f "$FORMULA_FILE" ]; then
   echo "Error: Formula file not found: $FORMULA_FILE"

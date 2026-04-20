@@ -137,7 +137,7 @@ jobs:
           else
             # Download tarball
             tarball_url="https://github.com/$repo/archive/refs/tags/v${latest_version}.tar.gz"
-            wget -q "$tarball_url" -O tarball.tar.gz
+            curl -fsSL "$tarball_url" -o tarball.tar.gz
 
             # Calculate SHA256
             sha256=$(sha256sum tarball.tar.gz | cut -d' ' -f1)
