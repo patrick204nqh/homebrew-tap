@@ -71,7 +71,7 @@ jobs:
           ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
 
       - name: Install formula
-        run: brew install --build-from-source "patrick204nqh/tap/${{ matrix.formula }}"
+        run: brew install --build-bottle "patrick204nqh/tap/${{ matrix.formula }}"
 
       - name: Run formula tests
         run: brew test "patrick204nqh/tap/${{ matrix.formula }}"
