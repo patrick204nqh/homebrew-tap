@@ -121,7 +121,7 @@ class Browserctl < Formula
         next unless ver_dir.directory?
 
         dst_ver = dst / ver_dir.basename
-        FileUtils.ln_sf ver_dir, dst_ver unless dst_ver.exist?
+        ln_sf ver_dir, dst_ver unless dst_ver.exist?
       end
     end
   end
