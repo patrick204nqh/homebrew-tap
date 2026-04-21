@@ -266,6 +266,7 @@ jobs:
         run: |
           snapshot_tag="${{ needs.detect.outputs.snapshot_tag }}"
           trigger="${{ github.event_name }}"
+          notes="${{ steps.versions.outputs.notes }}"
 
           if [ "$trigger" = "schedule" ]; then
             title="Weekly snapshot ${snapshot_tag}"
@@ -273,11 +274,7 @@ jobs:
             title="Snapshot ${snapshot_tag}"
           fi
 
-          body="## Formula versions
-
-${{ steps.versions.outputs.notes }}
----
-*Triggered by: ${trigger}.*"
+          body=$(printf '## Formula versions\n\n%s\n---\n*Triggered by: %s.*' "$notes" "$trigger")
 
           gh release edit "$snapshot_tag" \
             --title "$title" \
