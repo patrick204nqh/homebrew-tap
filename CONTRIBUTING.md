@@ -2,16 +2,17 @@
 
 ## CI strategy
 
-Two workflows handle all automation:
+Three workflows handle all automation:
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
+| [`snapshot.yml`](.github/workflows/snapshot.yml) | Weekly schedule · manual dispatch | Detect new upstream versions · update formulas · build and publish bottles · tag a tap snapshot release |
+| [`ci.yml`](.github/workflows/ci.yml) | Push to `main` by a human · manual dispatch | Lint · audit · build bottle · publish to GitHub Release for manually edited formulas |
 | [`pr.yml`](.github/workflows/pr.yml) | Pull request to `main` | RuboCop lint · `brew audit --strict` · `brew style` · install from source · `brew test` |
-| [`ci.yml`](.github/workflows/ci.yml) | Push to `main` | Same checks, then build bottle · publish to GitHub Release · delete stale releases · commit updated bottle block back to formula |
 
-PRs never build or publish bottles. Bottles are always built from the merged result on `main`.
+**Automated path (`snapshot.yml`):** runs end-to-end without any PRs or human steps. It detects new upstream releases, updates the formula, computes the SHA256, builds the bottle, publishes it to a GitHub Release, then creates a versioned tap snapshot. Bot commits carry `[skip ci]` so `ci.yml` does not double-build.
 
-After a successful main push, CI auto-commits a `bottles: <formula> v<version> [skip ci]` commit that updates the `bottle do` block in the formula with the new SHA256 and rebuild number. No manual step required.
+**Manual edit path (`ci.yml`):** if you edit a formula by hand and push directly to `main`, `ci.yml` picks it up and builds the bottle. The same job runs on `workflow_dispatch` for force-rebuilds.
 
 Bottles are stored as [GitHub Release](https://github.com/patrick204nqh/homebrew-tap/releases) assets — not in the repository. The `bottles/` directory is git-ignored.
 
@@ -38,12 +39,11 @@ Bottles are stored as [GitHub Release](https://github.com/patrick204nqh/homebrew
 
 ## Updating an existing formula
 
-Formulas are checked weekly (Monday 9 AM UTC) and auto-updated via the [Update Formulas](.github/workflows/update-formulas.yml) workflow. To trigger an out-of-band update manually:
+Formulas are checked and updated automatically by [`snapshot.yml`](.github/workflows/snapshot.yml), which runs weekly (Sunday 23:00 UTC). To trigger an out-of-band update immediately:
 
-1. Go to **Actions → Update Formulas → Run workflow**.
-2. Optionally specify a formula name, version, and SHA256 to fast-track a specific release.
+1. Go to **Actions → Snapshot → Run workflow**.
 
-The update workflow opens a PR bumping the version and SHA256. Merging that PR triggers `ci.yml` to rebuild the bottle.
+The snapshot workflow updates every formula that has a new upstream release, builds bottles, publishes per-formula releases, and tags a timestamped tap snapshot — all in one run, no PR required.
 
 ## Formula conventions
 

@@ -1,0 +1,285 @@
+name: Snapshot
+
+on:
+  schedule:
+    # Sunday 23:00 UTC — captures end-of-week state before Monday's update check.
+    # Disable by removing this block when actively developing; manual dispatch still works.
+    - cron: '0 23 * * 0'
+  workflow_dispatch:
+
+jobs:
+  detect:
+    name: Detect Updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      updates: ${{ steps.check.outputs.updates }}
+      snapshot_tag: ${{ steps.tag.outputs.snapshot_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute snapshot tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            # Weekly: date-only, one per week
+            tag="tap-$(date -u +%Y-%m-%d)"
+          else
+            # Manual: full timestamp, safe to trigger multiple times a day
+            tag="tap-$(date -u +%Y-%m-%dT%H-%M)"
+          fi
+          echo "snapshot_tag=$tag" >> $GITHUB_OUTPUT
+          echo "Snapshot tag: $tag"
+
+      - name: Detect formula updates
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          updates='[]'
+
+          for formula in Formula/*.rb; do
+            formula_name=$(basename "$formula" .rb)
+            echo "Checking $formula_name..."
+
+            current_version=$(grep -oP '(?:archive/refs/tags/v|releases/download/v)\K[0-9]+\.[0-9]+\.[0-9]+' "$formula" | head -1)
+            if [ -z "$current_version" ]; then
+              current_version=$(grep -oP '^\s+version\s+"\K[^"]+' "$formula" | head -1)
+            fi
+
+            repo_url=$(grep -oP '(?<=github\.com/)[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+' "$formula" | head -1)
+
+            if [ -z "$current_version" ] || [ -z "$repo_url" ]; then
+              echo "Could not extract version or repo for $formula_name, skipping."
+              continue
+            fi
+
+            echo "Current: $current_version  Repo: $repo_url"
+
+            latest_release=$(curl -sf -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$repo_url/releases/latest")
+            latest_version=$(echo "$latest_release" | jq -r '.tag_name' | sed 's/^v//')
+
+            if [ "$latest_version" = "null" ] || [ -z "$latest_version" ]; then
+              echo "No releases found for $formula_name, skipping."
+              continue
+            fi
+
+            echo "Latest: $latest_version"
+
+            if [ "$current_version" != "$latest_version" ]; then
+              echo "Queuing update: $current_version -> $latest_version"
+              entry=$(jq -n \
+                --arg name "$formula_name" \
+                --arg repo "$repo_url" \
+                --arg current "$current_version" \
+                --arg latest "$latest_version" \
+                '{name: $name, repo: $repo, current: $current, latest: $latest}')
+              updates=$(echo "$updates" | jq --argjson e "$entry" '. += [$e]')
+            else
+              echo "Already up to date."
+            fi
+            echo "---"
+          done
+
+          {
+            echo "updates<<EOF"
+            echo "$updates"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          echo "Updates queued: $(echo "$updates" | jq length)"
+
+  update-and-build:
+    name: Update and Build / ${{ matrix.formula.name }}
+    needs: detect
+    if: needs.detect.outputs.updates != '[]'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    # Serialize bottle commits so parallel matrix runs don't conflict on push
+    concurrency:
+      group: bottle-publish-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        formula: ${{ fromJson(needs.detect.outputs.updates) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+
+      - name: Tap local repo
+        run: |
+          mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
+          ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
+
+      - name: Update formula
+        run: |
+          formula_name="${{ matrix.formula.name }}"
+          latest_version="${{ matrix.formula.latest }}"
+
+          current_url=$(grep -oP 'url\s+"\K[^"]+' "Formula/${formula_name}.rb" | head -1)
+          current_version_in_url=$(echo "$current_url" | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          tarball_url=$(echo "$current_url" | sed "s/${current_version_in_url}/${latest_version}/g")
+
+          if [ -z "$tarball_url" ]; then
+            echo "ERROR: could not derive tarball URL for $formula_name"
+            exit 1
+          fi
+
+          echo "Downloading: $tarball_url"
+          curl -fSL "$tarball_url" -o tarball.tar.gz
+          sha256=$(sha256sum tarball.tar.gz | cut -d' ' -f1)
+          rm -f tarball.tar.gz
+
+          echo "SHA256: $sha256"
+          .github/scripts/update-formula.sh \
+            "Formula/${formula_name}.rb" \
+            "$latest_version" \
+            "$sha256" \
+            "${{ matrix.formula.repo }}"
+
+          git diff "Formula/${formula_name}.rb"
+
+      - name: Install and test
+        run: |
+          brew install --build-bottle "patrick204nqh/tap/${{ matrix.formula.name }}"
+          brew test "patrick204nqh/tap/${{ matrix.formula.name }}"
+
+      - name: Build bottle
+        run: |
+          version=$(brew info --json "patrick204nqh/tap/${{ matrix.formula.name }}" | jq -r '.[0].versions.stable')
+          echo "VERSION=$version" >> $GITHUB_ENV
+          brew bottle --json \
+            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/${{ matrix.formula.name }}-${version}" \
+            "patrick204nqh/tap/${{ matrix.formula.name }}"
+
+      - name: Merge bottle and commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          git pull --rebase origin main
+          brew bottle --merge --write --no-commit *.bottle*.json
+
+          rebuild=$(grep -E '^\s+rebuild [0-9]+' "Formula/${{ matrix.formula.name }}.rb" | grep -oE '[0-9]+' || echo "0")
+          old_bottle=$(ls *.bottle*.tar.gz | head -1)
+          os=$(echo "$old_bottle" | sed -E 's/.*\.([^.]+)\.bottle.*/\1/')
+          if [ "$rebuild" = "0" ]; then
+            new_bottle="${{ matrix.formula.name }}-${{ env.VERSION }}.${os}.bottle.tar.gz"
+          else
+            new_bottle="${{ matrix.formula.name }}-${{ env.VERSION }}.${os}.bottle.${rebuild}.tar.gz"
+          fi
+          [ "$old_bottle" != "$new_bottle" ] && mv "$old_bottle" "$new_bottle"
+          echo "BOTTLE_FILE=$new_bottle" >> $GITHUB_ENV
+
+          git add "Formula/${{ matrix.formula.name }}.rb"
+          if ! git diff --cached --quiet; then
+            git commit -m "bottles: ${{ matrix.formula.name }} v${{ env.VERSION }} [skip ci]"
+            pushed=false
+            for i in 1 2 3; do
+              if git pull --rebase origin main && git push origin HEAD:main; then
+                pushed=true
+                break
+              fi
+              sleep $((RANDOM % 10 + 5))
+            done
+            $pushed || { echo "ERROR: failed to push after 3 attempts"; exit 1; }
+          fi
+
+      - name: Publish per-formula release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ matrix.formula.name }}-${{ env.VERSION }}"
+          if ! gh release view "$tag" &>/dev/null; then
+            gh release create "$tag" \
+              --title "${{ matrix.formula.name }} v${{ env.VERSION }}" \
+              --notes "Pre-built bottles for \`${{ matrix.formula.name }}\` v${{ env.VERSION }}"
+          fi
+          gh release view "$tag" --json assets --jq '.assets[].name' \
+            | grep '\.bottle' \
+            | grep -v "^${{ env.BOTTLE_FILE }}$" \
+            | xargs -I{} gh release delete-asset "$tag" {} --yes || true
+          gh release upload "$tag" "${{ env.BOTTLE_FILE }}" --clobber
+
+      - name: Delete stale formula releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          current_tag="${{ matrix.formula.name }}-${{ env.VERSION }}"
+          gh release list --limit 100 --json tagName \
+            | jq -r '.[].tagName' \
+            | grep "^${{ matrix.formula.name }}-" \
+            | grep -v "^${current_tag}$" \
+            | grep -v "^tap-" \
+            | xargs -I{} sh -c 'gh release delete "$1" --yes --cleanup-tag || true' _ {}
+
+  tag-snapshot:
+    name: Tag Snapshot
+    needs: [detect, update-and-build]
+    # Always tag — even when no formula updates were found (snapshot records current state)
+    # Only skip if detect itself failed
+    if: always() && needs.detect.result == 'success' && needs.update-and-build.result != 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Pull latest main so the snapshot reflects any bottle commits just pushed
+          ref: main
+
+      - name: Collect formula versions
+        id: versions
+        run: |
+          notes=""
+          for formula in Formula/*.rb; do
+            name=$(basename "$formula" .rb)
+            version=$(grep -oP '(?:archive/refs/tags/v|releases/download/v)\K[0-9]+\.[0-9]+\.[0-9]+' "$formula" | head -1)
+            if [ -z "$version" ]; then
+              version=$(grep -oP '^\s+version\s+"\K[^"]+' "$formula" | head -1)
+            fi
+            version="${version:-unknown}"
+            notes="${notes}- \`${name}\` v${version}"$'\n'
+          done
+          {
+            echo "notes<<EOF"
+            echo "$notes"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create snapshot release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          snapshot_tag="${{ needs.detect.outputs.snapshot_tag }}"
+
+          if gh release view "$snapshot_tag" &>/dev/null; then
+            echo "Snapshot $snapshot_tag already exists, skipping."
+            exit 0
+          fi
+
+          trigger="${{ github.event_name }}"
+          if [ "$trigger" = "schedule" ]; then
+            title="Weekly snapshot ${snapshot_tag}"
+          else
+            title="Snapshot ${snapshot_tag}"
+          fi
+
+          gh release create "$snapshot_tag" \
+            --title "$title" \
+            --prerelease \
+            --notes "## Formula versions
+
+${{ steps.versions.outputs.notes }}
+---
+*Triggered by: ${trigger}. Bottles are published individually per formula release.*"

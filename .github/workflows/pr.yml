@@ -8,6 +8,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
@@ -20,9 +21,9 @@ jobs:
   detect-formulas:
     name: Detect Formulas
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       changed: ${{ steps.detect.outputs.changed }}
-      all: ${{ steps.detect.outputs.all }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,10 +37,7 @@ jobs:
             | jq -R . | jq -sc .)
           [ "$changed" = "[]" ] && changed="null"
 
-          all=$(ls Formula/*.rb | xargs -I{} basename {} .rb | jq -R . | jq -sc .)
-
           echo "changed=$changed" >> $GITHUB_OUTPUT
-          echo "all=$all" >> $GITHUB_OUTPUT
           echo "Changed formulas: $changed"
 
   audit:
@@ -47,6 +45,7 @@ jobs:
     needs: detect-formulas
     if: needs.detect-formulas.outputs.changed != 'null'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Set up Homebrew
@@ -66,6 +65,7 @@ jobs:
     needs: [lint, audit, detect-formulas]
     if: needs.detect-formulas.outputs.changed != 'null'
     runs-on: macos-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

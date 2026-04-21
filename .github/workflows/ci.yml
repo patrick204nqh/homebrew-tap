@@ -9,6 +9,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
@@ -21,6 +22,7 @@ jobs:
   audit:
     name: Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Set up Homebrew
@@ -39,6 +41,7 @@ jobs:
   detect-formulas:
     name: Detect Formulas
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       formulas: ${{ steps.detect.outputs.formulas }}
     steps:
@@ -52,7 +55,7 @@ jobs:
             | grep '^Formula/.*\.rb$' \
             | xargs -I{} basename {} .rb \
             | jq -R . | jq -sc .)
-          # Fall back to all formulas on workflow_dispatch or if detection fails
+          # On workflow_dispatch or no changes, fall back to all formulas
           if [ "$changed" = "[]" ] || [ "$changed" = "null" ]; then
             changed=$(ls Formula/*.rb | xargs -I{} basename {} .rb | jq -R . | jq -sc .)
             echo "No formula changes detected, falling back to all formulas"
@@ -63,7 +66,15 @@ jobs:
   build-and-publish:
     name: Build and Publish
     needs: [lint, audit, detect-formulas]
+    # Skip bot commits — snapshot.yml owns the automated update+build path.
+    # [skip ci] in bot commit messages already prevents this from firing,
+    # but the actor check is an explicit guard for clarity.
+    if: github.actor != 'github-actions[bot]'
     runs-on: macos-latest
+    timeout-minutes: 30
+    concurrency:
+      group: bottle-publish-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write
     strategy:
@@ -94,7 +105,7 @@ jobs:
             --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/${{ matrix.formula }}-${version}" \
             "patrick204nqh/tap/${{ matrix.formula }}"
 
-      - name: Merge bottle into formula and commit
+      - name: Merge bottle and commit
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -104,7 +115,6 @@ jobs:
           git pull --rebase origin main
           brew bottle --merge --write --no-commit *.bottle*.json
 
-          # Rename bottle file to match the rebuild number now in the formula
           rebuild=$(grep -E '^\s+rebuild [0-9]+' "Formula/${{ matrix.formula }}.rb" | grep -oE '[0-9]+' || echo "0")
           old_bottle=$(ls *.bottle*.tar.gz | head -1)
           os=$(echo "$old_bottle" | sed -E 's/.*\.([^.]+)\.bottle.*/\1/')
@@ -119,10 +129,15 @@ jobs:
           git add "Formula/${{ matrix.formula }}.rb"
           if ! git diff --cached --quiet; then
             git commit -m "bottles: ${{ matrix.formula }} v${{ env.VERSION }} [skip ci]"
+            pushed=false
             for i in 1 2 3; do
-              git pull --rebase origin main && git push origin HEAD:main && break
+              if git pull --rebase origin main && git push origin HEAD:main; then
+                pushed=true
+                break
+              fi
               sleep $((RANDOM % 10 + 5))
             done
+            $pushed || { echo "ERROR: failed to push after 3 attempts"; exit 1; }
           fi
 
       - name: Publish to GitHub Release
@@ -135,7 +150,6 @@ jobs:
               --title "${{ matrix.formula }} v${{ env.VERSION }}" \
               --notes "Pre-built bottles for \`${{ matrix.formula }}\` v${{ env.VERSION }}"
           fi
-          # Delete stale bottle assets (old rebuild numbers) before uploading
           gh release view "$tag" --json assets --jq '.assets[].name' \
             | grep '\.bottle' \
             | grep -v "^${{ env.BOTTLE_FILE }}$" \
@@ -151,4 +165,5 @@ jobs:
             | jq -r '.[].tagName' \
             | grep "^${{ matrix.formula }}-" \
             | grep -v "^${current_tag}$" \
+            | grep -v "^tap-" \
             | xargs -I{} sh -c 'gh release delete "$1" --yes --cleanup-tag || true' _ {}
