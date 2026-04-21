@@ -3,7 +3,6 @@ name: Snapshot
 on:
   schedule:
     # Sunday 23:00 UTC — captures end-of-week state before Monday's update check.
-    # Disable by removing this block when actively developing; manual dispatch still works.
     - cron: '0 23 * * 0'
   workflow_dispatch:
 
@@ -29,9 +28,8 @@ jobs:
             tag="tap-$(date -u +%Y-%m-%dT%H-%M)"
           fi
           echo "snapshot_tag=$tag" >> $GITHUB_OUTPUT
-          echo "Snapshot tag: $tag"
 
-      - name: Detect formula updates
+      - name: Collect formula targets
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -50,36 +48,36 @@ jobs:
             repo_url=$(grep -oP '(?<=github\.com/)[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+' "$formula" | head -1)
 
             if [ -z "$current_version" ] || [ -z "$repo_url" ]; then
-              echo "Could not extract version or repo for $formula_name, skipping."
+              echo "  Could not extract version or repo, skipping."
               continue
             fi
-
-            echo "Current: $current_version  Repo: $repo_url"
 
             latest_release=$(curl -sf -H "Authorization: token $GH_TOKEN" \
               "https://api.github.com/repos/$repo_url/releases/latest" || true)
             latest_version=$(echo "$latest_release" | jq -r '.tag_name // empty' | sed 's/^v//')
 
             if [ "$latest_version" = "null" ] || [ -z "$latest_version" ]; then
-              echo "No releases found for $formula_name, skipping."
+              echo "  No upstream release found, skipping."
               continue
             fi
 
-            echo "Latest: $latest_version"
+            echo "  current=$current_version  latest=$latest_version"
 
-            if [ "$current_version" != "$latest_version" ]; then
-              echo "Queuing update: $current_version -> $latest_version"
-              entry=$(jq -n \
-                --arg name "$formula_name" \
-                --arg repo "$repo_url" \
-                --arg current "$current_version" \
-                --arg latest "$latest_version" \
-                '{name: $name, repo: $repo, current: $current, latest: $latest}')
-              updates=$(echo "$updates" | jq --argjson e "$entry" '. += [$e]')
-            else
-              echo "Already up to date."
+            # schedule: skip formulas already at latest.
+            # workflow_dispatch: always include — enforce latest for full rebuild.
+            if [ "${{ github.event_name }}" = "schedule" ] && [ "$current_version" = "$latest_version" ]; then
+              echo "  Up to date, skipping."
+              continue
             fi
-            echo "---"
+
+            entry=$(jq -n \
+              --arg name "$formula_name" \
+              --arg repo "$repo_url" \
+              --arg current "$current_version" \
+              --arg latest "$latest_version" \
+              '{name: $name, repo: $repo, current: $current, latest: $latest}')
+            updates=$(echo "$updates" | jq --argjson e "$entry" '. += [$e]')
+            echo "  Queued."
           done
 
           {
@@ -87,11 +85,12 @@ jobs:
             echo "$updates"
             echo "EOF"
           } >> $GITHUB_OUTPUT
-          echo "Updates queued: $(echo "$updates" | jq length)"
+          echo "Total queued: $(echo "$updates" | jq length)"
 
   create-release:
     name: Create Snapshot Release
     needs: detect
+    if: needs.detect.outputs.updates != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -122,9 +121,8 @@ jobs:
     if: needs.detect.outputs.updates != '[]'
     runs-on: macos-latest
     timeout-minutes: 45
-    # Serialize matrix runs so bottle commits and release uploads don't conflict
     concurrency:
-      group: bottle-publish-${{ github.ref }}
+      group: bottle-publish-snapshot-${{ github.ref }}
       cancel-in-progress: false
     permissions:
       contents: write
@@ -135,15 +133,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@main
-
-      - name: Tap local repo
-        run: |
-          mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
-          ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
+      - name: Set up tap
+        uses: ./.github/actions/setup-tap
 
       - name: Update formula
+        # Skip when current == latest (manual dispatch on an already-up-to-date formula).
+        # Still installs and bottles below — just doesn't modify the formula file.
+        if: matrix.formula.current != matrix.formula.latest
         run: |
           formula_name="${{ matrix.formula.name }}"
           latest_version="${{ matrix.formula.latest }}"
@@ -162,7 +158,6 @@ jobs:
           sha256=$(sha256sum tarball.tar.gz | cut -d' ' -f1)
           rm -f tarball.tar.gz
 
-          echo "SHA256: $sha256"
           .github/scripts/update-formula.sh \
             "Formula/${formula_name}.rb" \
             "$latest_version" \
@@ -178,11 +173,10 @@ jobs:
 
       - name: Build bottle
         run: |
-          snapshot_tag="${{ needs.detect.outputs.snapshot_tag }}"
           version=$(brew info --json "patrick204nqh/tap/${{ matrix.formula.name }}" | jq -r '.[0].versions.stable')
           echo "VERSION=$version" >> $GITHUB_ENV
           brew bottle --json \
-            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/${snapshot_tag}" \
+            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/${{ needs.detect.outputs.snapshot_tag }}" \
             "patrick204nqh/tap/${{ matrix.formula.name }}"
 
       - name: Merge bottle and commit
@@ -230,8 +224,6 @@ jobs:
   tag-snapshot:
     name: Finalize Snapshot
     needs: [detect, create-release, update-and-build]
-    # Finalize even when no formula updates — snapshot still records current state.
-    # Only skip if detect or create-release failed, or update-and-build had errors.
     if: always() && needs.detect.result == 'success' && needs.create-release.result == 'success' && needs.update-and-build.result != 'failure'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -240,7 +232,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Pull latest main so versions reflect any bottle commits just pushed
           ref: main
 
       - name: Collect formula versions
@@ -269,7 +260,6 @@ jobs:
         run: |
           snapshot_tag="${{ needs.detect.outputs.snapshot_tag }}"
           trigger="${{ github.event_name }}"
-          notes="$SNAPSHOT_NOTES"
 
           if [ "$trigger" = "schedule" ]; then
             title="Weekly snapshot ${snapshot_tag}"
@@ -277,7 +267,7 @@ jobs:
             title="Snapshot ${snapshot_tag}"
           fi
 
-          body=$(printf '## Formula versions\n\n%s\n---\n*Triggered by: %s.*' "$notes" "$trigger")
+          body=$(printf '## Formula versions\n\n%s\n---\n*Triggered by: %s.*' "$SNAPSHOT_NOTES" "$trigger")
 
           gh release edit "$snapshot_tag" \
             --title "$title" \

@@ -19,25 +19,6 @@ jobs:
       - name: Run RuboCop
         run: bundle exec rubocop
 
-  audit:
-    name: Audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@main
-      - name: Audit and style-check formulas
-        run: |
-          mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
-          ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
-          for formula in Formula/*.rb; do
-            name=$(basename "$formula" .rb)
-            echo "--- $name ---"
-            brew audit --strict "patrick204nqh/tap/$name"
-            brew style "patrick204nqh/tap/$name"
-          done
-
   detect-formulas:
     name: Detect Formulas
     runs-on: ubuntu-latest
@@ -58,11 +39,9 @@ jobs:
 
           if [ "$changed" = "[]" ] || [ "$changed" = "null" ]; then
             if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-              # Manual dispatch: rebuild all formulas on demand
               changed=$(ls Formula/*.rb | xargs -I{} basename {} .rb | jq -R . | jq -sc .)
               echo "workflow_dispatch: building all formulas"
             else
-              # Push with no formula changes (e.g. workflow file edits) — nothing to build
               changed="[]"
               echo "No formula changes detected, skipping build"
             fi
@@ -71,16 +50,34 @@ jobs:
           echo "formulas=$changed" >> $GITHUB_OUTPUT
           echo "Formulas to build: $changed"
 
+  audit:
+    name: Audit
+    needs: detect-formulas
+    # Skip audit when no formulas changed (e.g. workflow-only push)
+    if: needs.detect-formulas.outputs.formulas != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up tap
+        uses: ./.github/actions/setup-tap
+      - name: Audit and style-check formulas
+        run: |
+          echo '${{ needs.detect-formulas.outputs.formulas }}' | jq -r '.[]' | while read -r name; do
+            echo "--- $name ---"
+            brew audit --strict "patrick204nqh/tap/$name"
+            brew style "patrick204nqh/tap/$name"
+          done
+
   build-and-publish:
     name: Build and Publish
     needs: [lint, audit, detect-formulas]
-    # Only run for human pushes that touched a formula, or manual dispatch.
     # Bot commits carry [skip ci] so they never reach here; actor check is a secondary guard.
     if: github.actor != 'github-actions[bot]' && needs.detect-formulas.outputs.formulas != '[]'
     runs-on: macos-latest
     timeout-minutes: 30
     concurrency:
-      group: bottle-publish-${{ github.ref }}
+      group: bottle-publish-ci-${{ github.ref }}
       cancel-in-progress: false
     permissions:
       contents: write
@@ -91,13 +88,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@main
-
-      - name: Tap local repo
-        run: |
-          mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
-          ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
+      - name: Set up tap
+        uses: ./.github/actions/setup-tap
 
       - name: Install and test
         run: |

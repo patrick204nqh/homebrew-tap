@@ -48,12 +48,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@main
+      - name: Set up tap
+        uses: ./.github/actions/setup-tap
       - name: Audit and style-check changed formulas
         run: |
-          mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
-          ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
           echo '${{ needs.detect-formulas.outputs.changed }}' | jq -r '.[]' | while read -r name; do
             echo "--- $name ---"
             brew audit --strict "patrick204nqh/tap/$name"
@@ -72,12 +70,10 @@ jobs:
         formula: ${{ fromJson(needs.detect-formulas.outputs.changed) }}
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@main
-      - name: Tap local repo
-        run: |
-          mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
-          ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
+
+      - name: Set up tap
+        uses: ./.github/actions/setup-tap
+
       - name: Install and test
         run: |
           brew install "patrick204nqh/tap/${{ matrix.formula }}"

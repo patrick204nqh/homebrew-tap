@@ -1,0 +1,14 @@
+name: Setup Tap
+description: Symlinks the workspace into the Homebrew tap directory so formulas are addressable as patrick204nqh/tap/<name>.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Homebrew
+      uses: Homebrew/actions/setup-homebrew@main
+
+    - name: Link tap
+      shell: bash
+      run: |
+        mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
+        ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
