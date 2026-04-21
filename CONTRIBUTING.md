@@ -14,7 +14,7 @@ Three workflows handle all automation:
 
 **Manual edit path (`ci.yml`):** if you edit a formula by hand and push directly to `main`, `ci.yml` picks it up and builds the bottle. The same job runs on `workflow_dispatch` for force-rebuilds.
 
-Bottles are stored as [GitHub Release](https://github.com/patrick204nqh/homebrew-tap/releases) assets — not in the repository. The `bottles/` directory is git-ignored.
+Bottles built by `snapshot.yml` are stored as assets under the snapshot release (e.g. `tap-2026-04-21`). Bottles built by `ci.yml` for manual edits go into a per-formula release (e.g. `browserctl-0.3.1`). Neither is committed to the repository — the `bottles/` directory is git-ignored.
 
 ## Adding a new formula
 

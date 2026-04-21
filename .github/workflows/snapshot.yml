@@ -24,10 +24,8 @@ jobs:
         id: tag
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            # Weekly: date-only, one per week
             tag="tap-$(date -u +%Y-%m-%d)"
           else
-            # Manual: full timestamp, safe to trigger multiple times a day
             tag="tap-$(date -u +%Y-%m-%dT%H-%M)"
           fi
           echo "snapshot_tag=$tag" >> $GITHUB_OUTPUT
@@ -91,13 +89,38 @@ jobs:
           } >> $GITHUB_OUTPUT
           echo "Updates queued: $(echo "$updates" | jq length)"
 
+  create-release:
+    name: Create Snapshot Release
+    needs: detect
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Create snapshot release (draft)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          snapshot_tag="${{ needs.detect.outputs.snapshot_tag }}"
+
+          if gh release view "$snapshot_tag" &>/dev/null; then
+            echo "Release $snapshot_tag already exists, skipping creation."
+            exit 0
+          fi
+
+          gh release create "$snapshot_tag" \
+            --title "$snapshot_tag" \
+            --prerelease \
+            --draft \
+            --notes "Building..."
+
   update-and-build:
     name: Update and Build / ${{ matrix.formula.name }}
-    needs: detect
+    needs: [detect, create-release]
     if: needs.detect.outputs.updates != '[]'
     runs-on: macos-latest
     timeout-minutes: 45
-    # Serialize bottle commits so parallel matrix runs don't conflict on push
+    # Serialize matrix runs so bottle commits and release uploads don't conflict
     concurrency:
       group: bottle-publish-${{ github.ref }}
       cancel-in-progress: false
@@ -153,10 +176,11 @@ jobs:
 
       - name: Build bottle
         run: |
+          snapshot_tag="${{ needs.detect.outputs.snapshot_tag }}"
           version=$(brew info --json "patrick204nqh/tap/${{ matrix.formula.name }}" | jq -r '.[0].versions.stable')
           echo "VERSION=$version" >> $GITHUB_ENV
           brew bottle --json \
-            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/${{ matrix.formula.name }}-${version}" \
+            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/${snapshot_tag}" \
             "patrick204nqh/tap/${{ matrix.formula.name }}"
 
       - name: Merge bottle and commit
@@ -194,40 +218,19 @@ jobs:
             $pushed || { echo "ERROR: failed to push after 3 attempts"; exit 1; }
           fi
 
-      - name: Publish per-formula release
+      - name: Upload bottle to snapshot release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${{ matrix.formula.name }}-${{ env.VERSION }}"
-          if ! gh release view "$tag" &>/dev/null; then
-            gh release create "$tag" \
-              --title "${{ matrix.formula.name }} v${{ env.VERSION }}" \
-              --notes "Pre-built bottles for \`${{ matrix.formula.name }}\` v${{ env.VERSION }}"
-          fi
-          gh release view "$tag" --json assets --jq '.assets[].name' \
-            | grep '\.bottle' \
-            | grep -v "^${{ env.BOTTLE_FILE }}$" \
-            | xargs -I{} gh release delete-asset "$tag" {} --yes || true
-          gh release upload "$tag" "${{ env.BOTTLE_FILE }}" --clobber
-
-      - name: Delete stale formula releases
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          current_tag="${{ matrix.formula.name }}-${{ env.VERSION }}"
-          gh release list --limit 100 --json tagName \
-            | jq -r '.[].tagName' \
-            | grep "^${{ matrix.formula.name }}-" \
-            | grep -v "^${current_tag}$" \
-            | grep -v "^tap-" \
-            | xargs -I{} sh -c 'gh release delete "$1" --yes --cleanup-tag || true' _ {}
+          gh release upload "${{ needs.detect.outputs.snapshot_tag }}" \
+            "${{ env.BOTTLE_FILE }}" --clobber
 
   tag-snapshot:
-    name: Tag Snapshot
-    needs: [detect, update-and-build]
-    # Always tag — even when no formula updates were found (snapshot records current state)
-    # Only skip if detect itself failed
-    if: always() && needs.detect.result == 'success' && needs.update-and-build.result != 'failure'
+    name: Finalize Snapshot
+    needs: [detect, create-release, update-and-build]
+    # Finalize even when no formula updates — snapshot still records current state.
+    # Only skip if detect or create-release failed, or update-and-build had errors.
+    if: always() && needs.detect.result == 'success' && needs.create-release.result == 'success' && needs.update-and-build.result != 'failure'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -235,7 +238,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Pull latest main so the snapshot reflects any bottle commits just pushed
+          # Pull latest main so versions reflect any bottle commits just pushed
           ref: main
 
       - name: Collect formula versions
@@ -257,29 +260,26 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: Create snapshot release
+      - name: Publish snapshot release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           snapshot_tag="${{ needs.detect.outputs.snapshot_tag }}"
-
-          if gh release view "$snapshot_tag" &>/dev/null; then
-            echo "Snapshot $snapshot_tag already exists, skipping."
-            exit 0
-          fi
-
           trigger="${{ github.event_name }}"
+
           if [ "$trigger" = "schedule" ]; then
             title="Weekly snapshot ${snapshot_tag}"
           else
             title="Snapshot ${snapshot_tag}"
           fi
 
-          gh release create "$snapshot_tag" \
-            --title "$title" \
-            --prerelease \
-            --notes "## Formula versions
+          body="## Formula versions
 
 ${{ steps.versions.outputs.notes }}
 ---
-*Triggered by: ${trigger}. Bottles are published individually per formula release.*"
+*Triggered by: ${trigger}.*"
+
+          gh release edit "$snapshot_tag" \
+            --title "$title" \
+            --notes "$body" \
+            --draft=false
