@@ -55,21 +55,28 @@ jobs:
             | grep '^Formula/.*\.rb$' \
             | xargs -I{} basename {} .rb \
             | jq -R . | jq -sc .)
-          # On workflow_dispatch or no changes, fall back to all formulas
+
           if [ "$changed" = "[]" ] || [ "$changed" = "null" ]; then
-            changed=$(ls Formula/*.rb | xargs -I{} basename {} .rb | jq -R . | jq -sc .)
-            echo "No formula changes detected, falling back to all formulas"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              # Manual dispatch: rebuild all formulas on demand
+              changed=$(ls Formula/*.rb | xargs -I{} basename {} .rb | jq -R . | jq -sc .)
+              echo "workflow_dispatch: building all formulas"
+            else
+              # Push with no formula changes (e.g. workflow file edits) — nothing to build
+              changed="[]"
+              echo "No formula changes detected, skipping build"
+            fi
           fi
+
           echo "formulas=$changed" >> $GITHUB_OUTPUT
           echo "Formulas to build: $changed"
 
   build-and-publish:
     name: Build and Publish
     needs: [lint, audit, detect-formulas]
-    # Skip bot commits — snapshot.yml owns the automated update+build path.
-    # [skip ci] in bot commit messages already prevents this from firing,
-    # but the actor check is an explicit guard for clarity.
-    if: github.actor != 'github-actions[bot]'
+    # Only run for human pushes that touched a formula, or manual dispatch.
+    # Bot commits carry [skip ci] so they never reach here; actor check is a secondary guard.
+    if: github.actor != 'github-actions[bot]' && needs.detect-formulas.outputs.formulas != '[]'
     runs-on: macos-latest
     timeout-minutes: 30
     concurrency:

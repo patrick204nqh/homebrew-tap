@@ -57,8 +57,8 @@ jobs:
             echo "Current: $current_version  Repo: $repo_url"
 
             latest_release=$(curl -sf -H "Authorization: token $GH_TOKEN" \
-              "https://api.github.com/repos/$repo_url/releases/latest")
-            latest_version=$(echo "$latest_release" | jq -r '.tag_name' | sed 's/^v//')
+              "https://api.github.com/repos/$repo_url/releases/latest" || true)
+            latest_version=$(echo "$latest_release" | jq -r '.tag_name // empty' | sed 's/^v//')
 
             if [ "$latest_version" = "null" ] || [ -z "$latest_version" ]; then
               echo "No releases found for $formula_name, skipping."
