@@ -265,10 +265,11 @@ jobs:
       - name: Publish snapshot release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SNAPSHOT_NOTES: ${{ steps.versions.outputs.notes }}
         run: |
           snapshot_tag="${{ needs.detect.outputs.snapshot_tag }}"
           trigger="${{ github.event_name }}"
-          notes="${{ steps.versions.outputs.notes }}"
+          notes="$SNAPSHOT_NOTES"
 
           if [ "$trigger" = "schedule" ]; then
             title="Weekly snapshot ${snapshot_tag}"
