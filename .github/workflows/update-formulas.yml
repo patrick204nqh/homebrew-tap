@@ -21,6 +21,7 @@ on:
 
 jobs:
   check-updates:
+    name: Check Updates
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -111,6 +112,7 @@ jobs:
           echo "$updates" | jq '.'
 
   update-formulas:
+    name: Update Formulas
     needs: check-updates
     if: needs.check-updates.outputs.updates != '[]'
     runs-on: ubuntu-latest

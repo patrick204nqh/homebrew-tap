@@ -7,6 +7,7 @@ on:
 
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +19,7 @@ jobs:
         run: bundle exec rubocop
 
   audit:
+    name: Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +37,7 @@ jobs:
           done
 
   detect-formulas:
+    name: Detect Formulas
     runs-on: ubuntu-latest
     outputs:
       formulas: ${{ steps.detect.outputs.formulas }}
@@ -58,6 +61,7 @@ jobs:
           echo "Formulas to build: $changed"
 
   build-and-publish:
+    name: Build and Publish
     needs: [lint, audit, detect-formulas]
     runs-on: macos-latest
     permissions:

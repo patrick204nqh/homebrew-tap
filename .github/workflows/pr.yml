@@ -1,4 +1,4 @@
-name: PR Check
+name: Validate PR
 
 on:
   pull_request:
@@ -6,6 +6,7 @@ on:
 
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,10 +14,11 @@ jobs:
         with:
           ruby-version: "3.4"
           bundler-cache: true
-      - name: Run RuboCop
+      - name: Lint
         run: bundle exec rubocop
 
   detect-formulas:
+    name: Detect Formulas
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.detect.outputs.changed }}
@@ -41,6 +43,7 @@ jobs:
           echo "Changed formulas: $changed"
 
   audit:
+    name: Audit
     needs: detect-formulas
     if: needs.detect-formulas.outputs.changed != 'null'
     runs-on: ubuntu-latest
@@ -59,6 +62,7 @@ jobs:
           done
 
   install:
+    name: Install
     needs: [lint, audit, detect-formulas]
     if: needs.detect-formulas.outputs.changed != 'null'
     runs-on: macos-latest
