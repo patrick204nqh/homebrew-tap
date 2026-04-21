@@ -105,39 +105,11 @@ jobs:
             "patrick204nqh/tap/${{ matrix.formula }}"
 
       - name: Merge bottle and commit
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
-          git pull --rebase origin main
-          brew bottle --merge --write --no-commit *.bottle*.json
-
-          rebuild=$(grep -E '^\s+rebuild [0-9]+' "Formula/${{ matrix.formula }}.rb" | grep -oE '[0-9]+' || echo "0")
-          old_bottle=$(ls *.bottle*.tar.gz | head -1)
-          os=$(echo "$old_bottle" | sed -E 's/.*\.([^.]+)\.bottle.*/\1/')
-          if [ "$rebuild" = "0" ]; then
-            new_bottle="${{ matrix.formula }}-${{ env.VERSION }}.${os}.bottle.tar.gz"
-          else
-            new_bottle="${{ matrix.formula }}-${{ env.VERSION }}.${os}.bottle.${rebuild}.tar.gz"
-          fi
-          [ "$old_bottle" != "$new_bottle" ] && mv "$old_bottle" "$new_bottle"
-          echo "BOTTLE_FILE=$new_bottle" >> $GITHUB_ENV
-
-          git add "Formula/${{ matrix.formula }}.rb"
-          if ! git diff --cached --quiet; then
-            git commit -m "bottles: ${{ matrix.formula }} v${{ env.VERSION }} [skip ci]"
-            pushed=false
-            for i in 1 2 3; do
-              if git pull --rebase origin main && git push origin HEAD:main; then
-                pushed=true
-                break
-              fi
-              sleep $((RANDOM % 10 + 5))
-            done
-            $pushed || { echo "ERROR: failed to push after 3 attempts"; exit 1; }
-          fi
+        uses: ./.github/actions/merge-bottle
+        with:
+          formula_name: ${{ matrix.formula }}
+          version: ${{ env.VERSION }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to GitHub Release
         env:

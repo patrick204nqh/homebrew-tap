@@ -1,0 +1,61 @@
+name: Merge Bottle and Commit
+description: Merges brew bottle JSON, renames the tarball, commits, and pushes with retry.
+
+inputs:
+  formula_name:
+    required: true
+    description: Homebrew formula name
+  version:
+    required: true
+    description: Formula version string
+  github_token:
+    required: true
+    description: GitHub token with contents:write permission
+
+outputs:
+  bottle_file:
+    description: Renamed bottle tarball filename
+    value: ${{ steps.merge.outputs.bottle_file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Merge, rename, commit and push
+      id: merge
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+        git pull --rebase origin main
+        brew bottle --merge --write --no-commit *.bottle*.json
+
+        formula_name="${{ inputs.formula_name }}"
+        version="${{ inputs.version }}"
+        rebuild=$(grep -E '^\s+rebuild [0-9]+' "Formula/${formula_name}.rb" | grep -oE '[0-9]+' || echo "0")
+        old_bottle=$(ls *.bottle*.tar.gz | head -1)
+        os=$(echo "$old_bottle" | sed -E 's/.*\.([^.]+)\.bottle.*/\1/')
+        if [ "$rebuild" = "0" ]; then
+          new_bottle="${formula_name}-${version}.${os}.bottle.tar.gz"
+        else
+          new_bottle="${formula_name}-${version}.${os}.bottle.${rebuild}.tar.gz"
+        fi
+        [ "$old_bottle" != "$new_bottle" ] && mv "$old_bottle" "$new_bottle"
+        echo "bottle_file=$new_bottle" >> $GITHUB_OUTPUT
+        echo "BOTTLE_FILE=$new_bottle" >> $GITHUB_ENV
+
+        git add "Formula/${formula_name}.rb"
+        if ! git diff --cached --quiet; then
+          git commit -m "bottles: ${formula_name} v${version} [skip ci]"
+          pushed=false
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              pushed=true
+              break
+            fi
+            sleep $((RANDOM % 10 + 5))
+          done
+          $pushed || { echo "ERROR: failed to push after 3 attempts"; exit 1; }
+        fi
