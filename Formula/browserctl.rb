@@ -7,14 +7,6 @@ class Browserctl < Formula
   sha256 "c42ba1dac906b71e8f58c4b3c0ac0d3e90cf48111bd5136d54bc951b37f24b5f"
   license "MIT"
 
-  bottle do
-    # :any_skip_relocation because we bundle our own relocatable Ruby runtime —
-    # nothing in the bottle has a hardcoded cellar or prefix path.
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-2026-04-21T14-11"
-    rebuild 9
-    sha256 cellar: :any_skip_relocation, arm64_sequoia: "FILL_IN_AFTER_REBUILD"
-  end
-
   # Bundled Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
   # Avoids depending on homebrew-core's `ruby` (which pulls in llvm) so bottles
   # work on any Homebrew prefix without source compilation.
