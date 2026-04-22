@@ -7,14 +7,6 @@ class SumologicQuery < Formula
   sha256 "4282fc7daa74ffd3a4d37bf87447b1282cd3ec7ee4217f63bd17a84592610620"
   license "MIT"
 
-  bottle do
-    # :any_skip_relocation because we bundle our own relocatable Ruby runtime —
-    # nothing in the bottle has a hardcoded cellar or prefix path.
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-2026-04-21T14-11"
-    rebuild 15
-    sha256 cellar: :any_skip_relocation, arm64_sequoia: "FILL_IN_AFTER_REBUILD"
-  end
-
   # Shared relocatable Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
   # Run that workflow once per Ruby version bump; all Ruby-based tap formulas share this release.
   # See docs/architecture/diagrams/04-build-ruby-runtime-manual.png for the full picture.
