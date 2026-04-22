@@ -57,7 +57,7 @@ class SumologicQuery < Formula
     libexec.install "lib"
     (libexec / "bin").install "bin/sumo-query"
 
-    ruby_version    = Utils.safe_popen_read(bundled_ruby, "-e", "puts RbConfig::CONFIG['ruby_version']").chomp
+    ruby_version = Utils.safe_popen_read(bundled_ruby, "-e", "puts RbConfig::CONFIG['ruby_version']").chomp
     ruby_stdlib_gems = ruby_runtime / "lib/ruby/gems" / ruby_version
 
     env = {
