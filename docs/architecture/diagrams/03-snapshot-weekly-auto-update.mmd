@@ -8,9 +8,10 @@ flowchart TD
     SKIP([skip])
 
     T --> DETECT
-    DETECT -->|updates found| CREATE & BUILD
+    DETECT -->|updates found| CREATE
     DETECT -->|nothing to update| SKIP
-    CREATE & BUILD --> TAG
+    CREATE --> BUILD
+    BUILD --> TAG
 
     style DETECT fill:#dbeafe,stroke:#93c5fd
     style CREATE fill:#dbeafe,stroke:#93c5fd

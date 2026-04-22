@@ -1,19 +1,14 @@
 flowchart TD
     T([pull_request → main])
 
-    LINT[lint]
-    DETECT[detect]
-    AUDIT[audit]
+    VALIDATE[validate\nlint · detect · audit\nreusable workflow]
     INSTALL[install\nmatrix per formula]
     SKIP([skip])
 
-    T --> LINT & DETECT
-    DETECT -->|changed| AUDIT
-    DETECT -->|nothing changed| SKIP
-    LINT & AUDIT & DETECT -->|changed| INSTALL
+    T --> VALIDATE
+    VALIDATE -->|formulas changed| INSTALL
+    VALIDATE -->|nothing changed| SKIP
 
-    style LINT    fill:#dbeafe,stroke:#93c5fd
-    style DETECT  fill:#dbeafe,stroke:#93c5fd
-    style AUDIT   fill:#dbeafe,stroke:#93c5fd
-    style INSTALL fill:#dcfce7,stroke:#86efac
-    style SKIP    fill:#f3f4f6,stroke:#d1d5db
+    style VALIDATE fill:#dbeafe,stroke:#93c5fd
+    style INSTALL  fill:#dcfce7,stroke:#86efac
+    style SKIP     fill:#f3f4f6,stroke:#d1d5db
