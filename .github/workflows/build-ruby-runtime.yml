@@ -60,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           ruby="$(pwd)/ruby-runtime/bin/ruby"
-          rbconfig=$("$ruby" -e "puts RbConfig::CONFIG['rubylibdir'] + '/rbconfig.rb'")
+          rbconfig=$("$ruby" -e "require 'rbconfig'; puts \$LOADED_FEATURES.grep(/rbconfig\\.rb$/).last")
           orig_prefix=$("$ruby" -e "puts RbConfig::CONFIG['prefix']")
           ruby .github/scripts/patch-rbconfig.rb "$rbconfig" "$orig_prefix"
 
