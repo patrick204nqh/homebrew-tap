@@ -7,6 +7,8 @@ class Browserctl < Formula
   sha256 "c42ba1dac906b71e8f58c4b3c0ac0d3e90cf48111bd5136d54bc951b37f24b5f"
   license "MIT"
 
+  depends_on "gmp"
+
   # Bundled Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
   # Avoids depending on homebrew-core's `ruby` (which pulls in llvm) so bottles
   # work on any Homebrew prefix without source compilation.
@@ -81,6 +83,25 @@ class Browserctl < Formula
     bundled_ruby = ruby_runtime / "bin/ruby"
     bundled_gem  = ruby_runtime / "bin/gem"
     gem_home     = libexec / "gems"
+
+    # The ruby-runtime tarball has paths hardcoded to the CI build directory.
+    # Fix the dylib load path in the ruby binary so it resolves libruby via
+    # @loader_path regardless of where the Cellar lives.
+    old_dylib = Utils.safe_popen_read("otool", "-L", bundled_ruby.to_s).lines
+      .map { |l| l.strip.split.first }
+      .find { |p| p =~ /libruby\.\d+\.\d+\.dylib$/ }
+    if old_dylib && !old_dylib.start_with?("@")
+      system "install_name_tool", "-change", old_dylib,
+             "@loader_path/../lib/#{File.basename(old_dylib)}", bundled_ruby
+    end
+
+    # Patch shebangs in all ruby wrapper scripts to point to the installed ruby.
+    Pathname.glob("#{ruby_runtime}/bin/*").each do |f|
+      next if f.symlink? || !f.file?
+      content = f.read
+      next unless content.match?(/\A#!.*ruby/)
+      f.write content.sub(/\A#!.*/, "#!#{bundled_ruby}")
+    end
 
     ENV["GEM_HOME"] = gem_home
 
