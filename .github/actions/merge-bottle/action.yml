@@ -1,4 +1,4 @@
-name: Merge Bottle and Commit
+name: Merge Bottle
 description: Merges brew bottle JSON, renames the tarball, commits, and pushes with retry.
 
 inputs:
@@ -12,11 +12,6 @@ inputs:
     required: true
     description: GitHub token with contents:write permission
 
-outputs:
-  bottle_file:
-    description: Renamed bottle tarball filename
-    value: ${{ steps.merge.outputs.bottle_file }}
-
 runs:
   using: composite
   steps:
@@ -26,9 +21,10 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
       run: |
+        set -euo pipefail
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+        git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         git pull --rebase origin main
         brew bottle --merge --write --no-commit *.bottle*.json
 
@@ -43,8 +39,7 @@ runs:
           new_bottle="${formula_name}-${version}.${os}.bottle.${rebuild}.tar.gz"
         fi
         [ "$old_bottle" != "$new_bottle" ] && mv "$old_bottle" "$new_bottle"
-        echo "bottle_file=$new_bottle" >> $GITHUB_OUTPUT
-        echo "BOTTLE_FILE=$new_bottle" >> $GITHUB_ENV
+        echo "BOTTLE_FILE=$new_bottle" >> "$GITHUB_ENV"
 
         git add "Formula/${formula_name}.rb"
         if ! git diff --cached --quiet; then

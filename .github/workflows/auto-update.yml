@@ -1,10 +1,13 @@
-name: Snapshot
+name: Auto Update
 
 on:
   schedule:
     # Sunday 23:00 UTC — captures end-of-week state before Monday's update check.
     - cron: '0 23 * * 0'
   workflow_dispatch:
+
+env:
+  TAP: patrick204nqh/tap
 
 jobs:
   detect:
@@ -21,20 +24,22 @@ jobs:
 
       - name: Compute snapshot tag
         id: tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            tag="tap-$(date -u +%Y-%m-%d)"
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            echo "snapshot_tag=tap-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
           else
-            tag="tap-$(date -u +%Y-%m-%dT%H-%M)"
+            echo "snapshot_tag=tap-$(date -u +%Y-%m-%dT%H-%M)" >> "$GITHUB_OUTPUT"
           fi
-          echo "snapshot_tag=$tag" >> $GITHUB_OUTPUT
 
       - name: Collect formula targets
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          updates='[]'
+          entries=()
 
           for formula in Formula/*.rb; do
             formula_name=$(basename "$formula" .rb)
@@ -65,7 +70,7 @@ jobs:
 
             # schedule: skip formulas already at latest.
             # workflow_dispatch: always include — enforce latest for full rebuild.
-            if [ "${{ github.event_name }}" = "schedule" ] && [ "$current_version" = "$latest_version" ]; then
+            if [ "$EVENT_NAME" = "schedule" ] && [ "$current_version" = "$latest_version" ]; then
               echo "  Up to date, skipping."
               continue
             fi
@@ -76,15 +81,16 @@ jobs:
               --arg current "$current_version" \
               --arg latest "$latest_version" \
               '{name: $name, repo: $repo, current: $current, latest: $latest}')
-            updates=$(echo "$updates" | jq --argjson e "$entry" '. += [$e]')
+            entries+=("$entry")
             echo "  Queued."
           done
 
+          updates=$(printf '%s\n' "${entries[@]+"${entries[@]}"}" | jq -sc .)
           {
             echo "updates<<EOF"
             echo "$updates"
             echo "EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
           echo "Total queued: $(echo "$updates" | jq length)"
 
   create-release:
@@ -98,17 +104,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create snapshot release (draft)
+      - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SNAPSHOT_TAG: ${{ needs.detect.outputs.snapshot_tag }}
         run: |
-          snapshot_tag="${{ needs.detect.outputs.snapshot_tag }}"
-
+          snapshot_tag="$SNAPSHOT_TAG"
           if gh release view "$snapshot_tag" &>/dev/null; then
-            echo "Release $snapshot_tag already exists, skipping creation."
+            echo "Release $snapshot_tag already exists, skipping."
             exit 0
           fi
-
           gh release create "$snapshot_tag" \
             --title "$snapshot_tag" \
             --prerelease \
@@ -133,16 +138,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up tap
-        uses: ./.github/actions/setup-tap
+      - uses: ./.github/actions/setup-tap
 
       - name: Update formula
         # Skip when current == latest (manual dispatch on an already-up-to-date formula).
-        # Still installs and bottles below — just doesn't modify the formula file.
         if: matrix.formula.current != matrix.formula.latest
+        env:
+          FORMULA_NAME: ${{ matrix.formula.name }}
+          LATEST_VERSION: ${{ matrix.formula.latest }}
         run: |
-          formula_name="${{ matrix.formula.name }}"
-          latest_version="${{ matrix.formula.latest }}"
+          formula_name="$FORMULA_NAME"
+          latest_version="$LATEST_VERSION"
 
           current_url=$(grep -oP 'url\s+"\K[^"]+' "Formula/${formula_name}.rb" | head -1)
           current_version_in_url=$(echo "$current_url" | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
@@ -158,28 +164,32 @@ jobs:
           sha256=$(sha256sum tarball.tar.gz | cut -d' ' -f1)
           rm -f tarball.tar.gz
 
-          .github/scripts/update-formula.sh \
+          ruby .github/scripts/update-formula.rb \
             "Formula/${formula_name}.rb" \
             "$latest_version" \
-            "$sha256" \
-            "${{ matrix.formula.repo }}"
+            "$sha256"
 
           git diff "Formula/${formula_name}.rb"
 
-      - name: Install and test
+      - name: Install for bottling
+        env:
+          FORMULA: ${{ matrix.formula.name }}
         run: |
-          brew install --build-bottle "patrick204nqh/tap/${{ matrix.formula.name }}"
-          brew test "patrick204nqh/tap/${{ matrix.formula.name }}"
+          brew install --build-bottle "$TAP/$FORMULA"
+          brew test "$TAP/$FORMULA"
 
       - name: Build bottle
+        env:
+          FORMULA: ${{ matrix.formula.name }}
+          SNAPSHOT_TAG: ${{ needs.detect.outputs.snapshot_tag }}
         run: |
-          version=$(brew info --json "patrick204nqh/tap/${{ matrix.formula.name }}" | jq -r '.[0].versions.stable')
-          echo "VERSION=$version" >> $GITHUB_ENV
+          version=$(brew info --json "$TAP/$FORMULA" | jq -r '.[0].versions.stable')
+          echo "VERSION=$version" >> "$GITHUB_ENV"
           brew bottle --json \
-            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/${{ needs.detect.outputs.snapshot_tag }}" \
-            "patrick204nqh/tap/${{ matrix.formula.name }}"
+            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/$SNAPSHOT_TAG" \
+            "$TAP/$FORMULA"
 
-      - name: Merge bottle and commit
+      - name: Merge bottle
         uses: ./.github/actions/merge-bottle
         with:
           formula_name: ${{ matrix.formula.name }}
@@ -189,14 +199,14 @@ jobs:
       - name: Upload bottle to snapshot release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SNAPSHOT_TAG: ${{ needs.detect.outputs.snapshot_tag }}
         run: |
-          gh release upload "${{ needs.detect.outputs.snapshot_tag }}" \
-            "${{ env.BOTTLE_FILE }}" --clobber
+          gh release upload "$SNAPSHOT_TAG" "$BOTTLE_FILE" --clobber
 
   tag-snapshot:
     name: Finalize Snapshot
     needs: [detect, create-release, update-and-build]
-    if: always() && needs.detect.result == 'success' && needs.create-release.result == 'success' && needs.update-and-build.result != 'failure'
+    if: "!cancelled() && needs.update-and-build.result != 'failure'"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -223,15 +233,17 @@ jobs:
             echo "notes<<EOF"
             echo "$notes"
             echo "EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
 
       - name: Publish snapshot release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SNAPSHOT_NOTES: ${{ steps.versions.outputs.notes }}
+          SNAPSHOT_TAG: ${{ needs.detect.outputs.snapshot_tag }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          snapshot_tag="${{ needs.detect.outputs.snapshot_tag }}"
-          trigger="${{ github.event_name }}"
+          snapshot_tag="$SNAPSHOT_TAG"
+          trigger="$EVENT_NAME"
 
           if [ "$trigger" = "schedule" ]; then
             title="Weekly snapshot ${snapshot_tag}"
@@ -241,7 +253,7 @@ jobs:
 
           body=$(printf '## Formula versions\n\n%s\n---\n*Triggered by: %s.*' "$SNAPSHOT_NOTES" "$trigger")
 
-          gh release edit "$snapshot_tag" \
+          gh release edit "$SNAPSHOT_TAG" \
             --title "$title" \
             --notes "$body" \
             --draft=false \

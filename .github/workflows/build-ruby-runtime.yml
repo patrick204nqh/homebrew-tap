@@ -1,0 +1,103 @@
+name: Build Ruby Runtime
+
+# ─── PURPOSE ────────────────────────────────────────────────────────────────
+# Builds a self-contained, relocatable Ruby binary and publishes it as a
+# GitHub release artifact.  All Ruby-based tap formulas reference this runtime
+# instead of depending on Homebrew's `ruby` formula, which would drag in `llvm`
+# and force users to compile from source on any non-standard Homebrew prefix.
+#
+# ─── WHEN TO RUN ────────────────────────────────────────────────────────────
+# • Once on initial tap setup (no ruby-runtime release exists yet).
+# • When upgrading the bundled Ruby version (e.g. security/bug-fix patch).
+#   Frequency: infrequent — typically once or twice per year.
+#
+# ─── NOT NEEDED WHEN ────────────────────────────────────────────────────────
+# • A formula's own version bumps (ci.yml / snapshot.yml handle those).
+# • Adding a new formula — it reuses the existing runtime release.
+#
+# ─── AFTER RUNNING ──────────────────────────────────────────────────────────
+# 1. Copy the sha256 printed in the Job Summary.
+# 2. Update RUBY_RUNTIME_VERSION + sha256 in every formula that uses it.
+# 3. Push → ci.yml detects the changed formulas → rebuilds and publishes bottles.
+# ────────────────────────────────────────────────────────────────────────────
+on:
+  workflow_dispatch:
+    inputs:
+      ruby_version:
+        description: "Ruby version to build (e.g. 3.3.6)"
+        required: true
+        default: "3.3.6"
+
+jobs:
+  build:
+    name: Build arm64
+    runs-on: macos-latest   # macos-latest is arm64 (M-series)
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      RUBY_VERSION: ${{ inputs.ruby_version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate inputs
+        run: |
+          echo "$RUBY_VERSION" \
+            | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            || { echo "ERROR: ruby_version must be in X.Y.Z format"; exit 1; }
+
+      - name: Install ruby-build
+        run: brew install ruby-build
+
+      - name: Build Ruby ${{ inputs.ruby_version }}
+        run: |
+          set -euo pipefail
+          ruby-build "$RUBY_VERSION" "$(pwd)/ruby-runtime"
+          echo "Built: $("$(pwd)/ruby-runtime/bin/ruby" -e 'puts RUBY_VERSION')"
+
+      - name: Make runtime relocatable
+        run: |
+          set -euo pipefail
+          ruby="$(pwd)/ruby-runtime/bin/ruby"
+          rbconfig=$("$ruby" -e "puts RbConfig::CONFIG['rubylibdir'] + '/rbconfig.rb'")
+          orig_prefix=$("$ruby" -e "puts RbConfig::CONFIG['prefix']")
+          ruby .github/scripts/patch-rbconfig.rb "$rbconfig" "$orig_prefix"
+
+      - name: Strip and archive
+        run: |
+          set -euo pipefail
+          INSTALL_DIR="$(pwd)/ruby-runtime"
+
+          rm -rf "$INSTALL_DIR/share/doc" "$INSTALL_DIR/share/man"
+          find "$INSTALL_DIR" -name "*.o" -delete
+
+          TARBALL="ruby-runtime-${RUBY_VERSION}-arm64-darwin.tar.gz"
+          tar -czf "$TARBALL" -C "$(dirname "$INSTALL_DIR")" "$(basename "$INSTALL_DIR")"
+
+          SHA=$(shasum -a 256 "$TARBALL" | awk '{print $1}')
+          echo "TARBALL=$TARBALL" >> "$GITHUB_ENV"
+
+          echo "### Ruby runtime ${RUBY_VERSION} (arm64)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "sha256 \"${SHA}\"" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="ruby-runtime-${RUBY_VERSION}"
+
+          # Discover which formulas reference this runtime — no hardcoding needed.
+          consumers=$(grep -rl 'resource "ruby-runtime"' Formula/*.rb \
+            | xargs -I{} basename {} .rb \
+            | paste -sd ', ')
+
+          if ! gh release view "$TAG" &>/dev/null; then
+            gh release create "$TAG" \
+              --title "Ruby runtime ${RUBY_VERSION}" \
+              --notes "Relocatable Ruby ${RUBY_VERSION} (arm64). Used by: ${consumers}."
+          fi
+
+          gh release upload "$TAG" "$TARBALL" --clobber

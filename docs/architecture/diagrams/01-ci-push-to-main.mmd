@@ -1,0 +1,19 @@
+flowchart TD
+    T([push: main / workflow_dispatch])
+
+    LINT[lint]
+    DETECT[detect]
+    AUDIT[audit]
+    BUILD[build-and-publish\nmatrix per formula]
+    SKIP([skip])
+
+    T --> LINT & DETECT
+    DETECT -->|changed| AUDIT
+    DETECT -->|nothing changed| SKIP
+    LINT & AUDIT & DETECT -->|changed, not bot| BUILD
+
+    style LINT   fill:#dbeafe,stroke:#93c5fd
+    style DETECT fill:#dbeafe,stroke:#93c5fd
+    style AUDIT  fill:#dbeafe,stroke:#93c5fd
+    style BUILD  fill:#dcfce7,stroke:#86efac
+    style SKIP   fill:#f3f4f6,stroke:#d1d5db

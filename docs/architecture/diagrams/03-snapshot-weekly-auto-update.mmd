@@ -1,0 +1,19 @@
+flowchart TD
+    T([cron Sun 23:00 UTC / workflow_dispatch])
+
+    DETECT[detect\ncheck upstream versions]
+    CREATE[create-release\ndraft]
+    BUILD[update-and-build\nmatrix per formula]
+    TAG[tag-snapshot\npublish]
+    SKIP([skip])
+
+    T --> DETECT
+    DETECT -->|updates found| CREATE & BUILD
+    DETECT -->|nothing to update| SKIP
+    CREATE & BUILD --> TAG
+
+    style DETECT fill:#dbeafe,stroke:#93c5fd
+    style CREATE fill:#dbeafe,stroke:#93c5fd
+    style BUILD  fill:#dcfce7,stroke:#86efac
+    style TAG    fill:#dbeafe,stroke:#93c5fd
+    style SKIP   fill:#f3f4f6,stroke:#d1d5db

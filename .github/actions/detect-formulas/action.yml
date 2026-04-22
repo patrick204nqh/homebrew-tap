@@ -1,0 +1,59 @@
+name: Detect Formulas
+description: >
+  Returns a JSON array of formula names whose .rb files changed relative
+  to the comparison base. Supports push (HEAD~1 vs HEAD) and pr (base...HEAD) modes.
+
+inputs:
+  mode:
+    description: '"push" compares HEAD~1..HEAD; "pr" compares base_ref...HEAD'
+    required: false
+    default: push
+  base_ref:
+    description: PR base branch (e.g. "main") — only used when mode=pr
+    required: false
+    default: ""
+  all_on_dispatch:
+    description: Return all formulas when triggered by workflow_dispatch (push mode only)
+    required: false
+    default: "true"
+
+outputs:
+  formulas:
+    description: JSON array of changed formula names, e.g. '["my-formula","other-formula"]'
+    value: ${{ steps.detect.outputs.formulas }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect changed formulas
+      id: detect
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        BASE_REF: ${{ inputs.base_ref }}
+        ALL_ON_DISPATCH: ${{ inputs.all_on_dispatch }}
+        EVENT_NAME: ${{ github.event_name }}
+      run: |
+        set -euo pipefail
+
+        if [ "$MODE" = "pr" ]; then
+          formulas=$(git diff --name-only "origin/${BASE_REF}...HEAD" \
+            | grep '^Formula/.*\.rb$' \
+            | xargs -I{} basename {} .rb \
+            | jq -R . | jq -sc .)
+        else
+          formulas=$(git diff --name-only HEAD~1 HEAD \
+            | grep '^Formula/.*\.rb$' \
+            | xargs -I{} basename {} .rb \
+            | jq -R . | jq -sc .)
+
+          if [ "$formulas" = "[]" ] && \
+             [ "$ALL_ON_DISPATCH" = "true" ] && \
+             [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            formulas=$(find Formula -maxdepth 1 -name '*.rb' -exec basename {} .rb \; | jq -R . | jq -sc .)
+            echo "workflow_dispatch: queuing all formulas"
+          fi
+        fi
+
+        echo "formulas=$formulas" >> "$GITHUB_OUTPUT"
+        echo "Detected: $formulas"

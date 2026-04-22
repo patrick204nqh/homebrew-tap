@@ -8,23 +8,32 @@ class Browserctl < Formula
   license "MIT"
 
   bottle do
+    # :any_skip_relocation because we bundle our own relocatable Ruby runtime —
+    # nothing in the bottle has a hardcoded cellar or prefix path.
     root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-2026-04-21T14-11"
-    rebuild 8
-    sha256 cellar: :any, arm64_sequoia: "04021f45dd5de53cc06ce2300b17ec90034bec370e323a5d52d4f7651e0829ed"
+    rebuild 9
+    sha256 cellar: :any_skip_relocation, arm64_sequoia: "FILL_IN_AFTER_REBUILD"
   end
 
-  depends_on "ruby"
+  # Bundled Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
+  # Avoids depending on homebrew-core's `ruby` (which pulls in llvm) so bottles
+  # work on any Homebrew prefix without source compilation.
+  #
+  # To update: run the build-ruby-runtime workflow for the desired version, then
+  # replace the sha256 values below with the ones printed in the workflow summary.
+  RUBY_RUNTIME_VERSION = "3.3.6"
 
-  # nokogiri — precompiled platform gems (avoids needing libxml2/libxslt)
+  resource "ruby-runtime" do
+    url "https://github.com/patrick204nqh/homebrew-tap/releases/download/" \
+        "ruby-runtime-#{RUBY_RUNTIME_VERSION}/" \
+        "ruby-runtime-#{RUBY_RUNTIME_VERSION}-arm64-darwin.tar.gz"
+    sha256 "FILL_IN_AFTER_RUNNING_BUILD_RUBY_RUNTIME_WORKFLOW"
+  end
+
+  # nokogiri — precompiled arm64 platform gem (avoids needing libxml2/libxslt)
   resource "nokogiri" do
-    on_arm do
-      url "https://rubygems.org/downloads/nokogiri-1.19.2-arm64-darwin.gem"
-      sha256 "58d8ea2e31a967b843b70487a44c14c8ba1866daa1b9da9be9dbdf1b43dee205"
-    end
-    on_intel do
-      url "https://rubygems.org/downloads/nokogiri-1.19.2-x86_64-darwin.gem"
-      sha256 "7d9af11fda72dfaa2961d8c4d5380ca0b51bc389dc5f8d4b859b9644f195e7a4"
-    end
+    url "https://rubygems.org/downloads/nokogiri-1.19.2-arm64-darwin.gem"
+    sha256 "58d8ea2e31a967b843b70487a44c14c8ba1866daa1b9da9be9dbdf1b43dee205"
   end
 
   # ferrum and its transitive deps
@@ -74,27 +83,34 @@ class Browserctl < Formula
   end
 
   def install
-    ENV["GEM_HOME"] = libexec
-    resources.each do |r|
+    ruby_runtime = libexec / "ruby-runtime"
+    resource("ruby-runtime").stage { ruby_runtime.install Dir["*"] }
+
+    bundled_ruby = ruby_runtime / "bin/ruby"
+    bundled_gem  = ruby_runtime / "bin/gem"
+    gem_home     = libexec / "gems"
+
+    ENV["GEM_HOME"] = gem_home
+
+    (resources - [resource("ruby-runtime")]).each do |r|
       r.stage do
-        system "gem", "install", r.cached_download,
-               "--no-document", "--ignore-dependencies", "--install-dir", libexec
+        system bundled_gem, "install", r.cached_download,
+               "--no-document", "--ignore-dependencies", "--install-dir", gem_home
       end
     end
 
     libexec.install "lib"
     (libexec / "bin").install "bin/browserctl", "bin/browserd"
 
-    # Include Ruby's default gem path so bundled gems (e.g. racc) are found
-    # even when native extensions were compiled for a different darwin minor version.
     ruby_version = Utils.safe_popen_read(
-      Formula["ruby"].opt_bin / "ruby", "-e", "puts RbConfig::CONFIG['ruby_version']"
+      bundled_ruby, "-e", "puts RbConfig::CONFIG['ruby_version']"
     ).chomp
-    ruby_gem_path = Formula["ruby"].opt_lib / "ruby/gems" / ruby_version
+    ruby_stdlib_gems = ruby_runtime / "lib/ruby/gems" / ruby_version
+
     env = {
-      GEM_HOME: libexec,
-      GEM_PATH: "#{libexec}#{File::PATH_SEPARATOR}#{ruby_gem_path}",
-      PATH:     "#{Formula["ruby"].opt_bin}#{File::PATH_SEPARATOR}#{ENV.fetch("PATH", nil)}",
+      GEM_HOME: gem_home,
+      GEM_PATH: "#{gem_home}#{File::PATH_SEPARATOR}#{ruby_stdlib_gems}",
+      PATH:     "#{ruby_runtime / "bin"}#{File::PATH_SEPARATOR}#{ENV.fetch("PATH", nil)}",
     }
     (bin / "browserctl").write_env_script(libexec / "bin/browserctl", env)
     (bin / "browserd").write_env_script(libexec / "bin/browserd", env)
@@ -105,10 +121,9 @@ class Browserctl < Formula
     # native extension .bundles land in the wrong platform directory.
     # They are binary-compatible within the same Ruby major.minor + arch,
     # so we symlink the built platform dir to the current one.
-    current_platform = Utils.safe_popen_read(
-      Formula["ruby"].opt_bin / "ruby", "-e", "puts Gem::Platform.local"
-    ).chomp
-    ext_dir = libexec / "extensions"
+    bundled_ruby = libexec / "ruby-runtime/bin/ruby"
+    current_platform = Utils.safe_popen_read(bundled_ruby, "-e", "puts Gem::Platform.local").chomp
+    ext_dir = libexec / "gems/extensions"
     return unless ext_dir.exist?
     return if (ext_dir / current_platform).exist?
 

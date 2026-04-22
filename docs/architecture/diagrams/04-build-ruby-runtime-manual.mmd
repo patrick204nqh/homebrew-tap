@@ -1,0 +1,14 @@
+flowchart TD
+    T([workflow_dispatch\nruby_version input])
+
+    BUILD[build\nruby-build VERSION]
+    PATCH[patch\nrbconfig relocatable]
+    ARCHIVE[archive\ntar + sha256]
+    UPLOAD[upload\ngh release]
+
+    T --> BUILD --> PATCH --> ARCHIVE --> UPLOAD
+
+    style BUILD   fill:#dcfce7,stroke:#86efac
+    style PATCH   fill:#dcfce7,stroke:#86efac
+    style ARCHIVE fill:#dcfce7,stroke:#86efac
+    style UPLOAD  fill:#dcfce7,stroke:#86efac

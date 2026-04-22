@@ -8,12 +8,24 @@ class SumologicQuery < Formula
   license "MIT"
 
   bottle do
+    # :any_skip_relocation because we bundle our own relocatable Ruby runtime —
+    # nothing in the bottle has a hardcoded cellar or prefix path.
     root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-2026-04-21T14-11"
-    rebuild 14
-    sha256 cellar: :any_skip_relocation, arm64_sequoia: "5c2a80cb100948371599056c6339d6e57112487fa688e965947d9798f43b24ec"
+    rebuild 15
+    sha256 cellar: :any_skip_relocation, arm64_sequoia: "FILL_IN_AFTER_REBUILD"
   end
 
-  depends_on "ruby"
+  # Shared relocatable Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
+  # Run that workflow once per Ruby version bump; all Ruby-based tap formulas share this release.
+  # See docs/architecture/diagrams/04-build-ruby-runtime-manual.png for the full picture.
+  RUBY_RUNTIME_VERSION = "3.3.6"
+
+  resource "ruby-runtime" do
+    url "https://github.com/patrick204nqh/homebrew-tap/releases/download/" \
+        "ruby-runtime-#{RUBY_RUNTIME_VERSION}/" \
+        "ruby-runtime-#{RUBY_RUNTIME_VERSION}-arm64-darwin.tar.gz"
+    sha256 "FILL_IN_AFTER_RUNNING_BUILD_RUBY_RUNTIME_WORKFLOW"
+  end
 
   resource "thor" do
     url "https://rubygems.org/downloads/thor-1.3.2.gem"
@@ -26,17 +38,34 @@ class SumologicQuery < Formula
   end
 
   def install
-    ENV["GEM_HOME"] = libexec
-    resources.each do |r|
+    ruby_runtime = libexec / "ruby-runtime"
+    resource("ruby-runtime").stage { ruby_runtime.install Dir["*"] }
+
+    bundled_ruby = ruby_runtime / "bin/ruby"
+    bundled_gem  = ruby_runtime / "bin/gem"
+    gem_home     = libexec / "gems"
+
+    ENV["GEM_HOME"] = gem_home
+
+    (resources - [resource("ruby-runtime")]).each do |r|
       r.stage do
-        system "gem", "install", r.cached_download,
-               "--no-document", "--ignore-dependencies", "--install-dir", libexec
+        system bundled_gem, "install", r.cached_download,
+               "--no-document", "--ignore-dependencies", "--install-dir", gem_home
       end
     end
 
     libexec.install "lib"
     (libexec / "bin").install "bin/sumo-query"
-    (bin / "sumo-query").write_env_script(libexec / "bin/sumo-query", GEM_HOME: libexec, GEM_PATH: libexec)
+
+    ruby_version    = Utils.safe_popen_read(bundled_ruby, "-e", "puts RbConfig::CONFIG['ruby_version']").chomp
+    ruby_stdlib_gems = ruby_runtime / "lib/ruby/gems" / ruby_version
+
+    env = {
+      GEM_HOME: gem_home,
+      GEM_PATH: "#{gem_home}#{File::PATH_SEPARATOR}#{ruby_stdlib_gems}",
+      PATH:     "#{ruby_runtime / "bin"}#{File::PATH_SEPARATOR}#{ENV.fetch("PATH", nil)}",
+    }
+    (bin / "sumo-query").write_env_script(libexec / "bin/sumo-query", env)
   end
 
   def caveats

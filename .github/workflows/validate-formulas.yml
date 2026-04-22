@@ -1,0 +1,76 @@
+name: Validate Formulas
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: '"push" compares HEAD~1..HEAD; "pr" compares base_ref...HEAD'
+        type: string
+        required: true
+      base_ref:
+        description: PR base branch — only used when mode=pr
+        type: string
+        required: false
+        default: ""
+    outputs:
+      formulas:
+        description: JSON array of changed formula names
+        value: ${{ jobs.detect.outputs.formulas }}
+
+env:
+  TAP: patrick204nqh/tap
+  RUBY_VERSION: "3.4"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+      - run: bundle exec rubocop
+
+  detect:
+    name: Detect Formulas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      formulas: ${{ steps.detect.outputs.formulas }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/detect-formulas
+        id: detect
+        with:
+          mode: ${{ inputs.mode }}
+          base_ref: ${{ inputs.base_ref }}
+
+  audit:
+    name: Audit
+    needs: detect
+    if: needs.detect.outputs.formulas != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-tap
+      - name: Audit and style-check formulas
+        env:
+          FORMULAS: ${{ needs.detect.outputs.formulas }}
+        run: |
+          echo "$FORMULAS" | jq -r '.[]' | while read -r name; do
+            echo "--- $name ---"
+            brew audit --strict "$TAP/$name"
+            brew style "$TAP/$name"
+          done

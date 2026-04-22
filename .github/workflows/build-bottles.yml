@@ -1,0 +1,93 @@
+name: Build Bottles
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  TAP: patrick204nqh/tap
+
+jobs:
+  validate:
+    name: Validate
+    uses: ./.github/workflows/validate-formulas.yml
+    with:
+      mode: push
+
+  build-and-publish:
+    name: Build / ${{ matrix.formula }}
+    needs: validate
+    # Bot commits carry [skip ci]; actor check is a secondary guard.
+    if: github.actor != 'github-actions[bot]' && needs.validate.outputs.formulas != '[]'
+    runs-on: macos-latest
+    timeout-minutes: 30
+    concurrency:
+      group: bottle-publish-ci-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        formula: ${{ fromJson(needs.validate.outputs.formulas) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-tap
+
+      - name: Install for bottling
+        env:
+          TAP: ${{ env.TAP }}
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          brew install --build-bottle "$TAP/$FORMULA"
+          brew test "$TAP/$FORMULA"
+
+      - name: Build bottle
+        env:
+          TAP: ${{ env.TAP }}
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          version=$(brew info --json "$TAP/$FORMULA" | jq -r '.[0].versions.stable')
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          brew bottle --json \
+            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/$FORMULA-${version}" \
+            "$TAP/$FORMULA"
+
+      - name: Merge bottle
+        uses: ./.github/actions/merge-bottle
+        with:
+          formula_name: ${{ matrix.formula }}
+          version: ${{ env.VERSION }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          tag="$FORMULA-${{ env.VERSION }}"
+          if ! gh release view "$tag" &>/dev/null; then
+            gh release create "$tag" \
+              --title "$FORMULA v${{ env.VERSION }}" \
+              --notes "Pre-built bottles for \`$FORMULA\` v${{ env.VERSION }}"
+          fi
+          gh release view "$tag" --json assets --jq '.assets[].name' \
+            | grep '\.bottle' \
+            | grep -v "^${{ env.BOTTLE_FILE }}$" \
+            | xargs -I{} gh release delete-asset "$tag" {} --yes || true
+          gh release upload "$tag" "${{ env.BOTTLE_FILE }}" --clobber
+
+      - name: Delete stale releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          current_tag="$FORMULA-${{ env.VERSION }}"
+          gh release list --limit 100 --json tagName \
+            | jq -r '.[].tagName' \
+            | grep "^$FORMULA-" \
+            | grep -v "^${current_tag}$" \
+            | grep -v "^tap-" \
+            | xargs -I{} sh -c 'gh release delete "$1" --yes --cleanup-tag || true' _ {}
