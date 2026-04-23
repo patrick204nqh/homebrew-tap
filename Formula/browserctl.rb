@@ -84,23 +84,25 @@ class Browserctl < Formula
     bundled_gem  = ruby_runtime / "bin/gem"
     gem_home     = libexec / "gems"
 
-    # The ruby-runtime tarball has paths hardcoded to the CI build directory.
-    # Fix the dylib load path in the ruby binary so it resolves libruby via
-    # @loader_path regardless of where the Cellar lives.
-    old_dylib = Utils.safe_popen_read("otool", "-L", bundled_ruby.to_s).lines
-      .map { |l| l.strip.split.first }
-      .find { |p| p =~ /libruby\.\d+\.\d+\.dylib$/ }
-    if old_dylib && !old_dylib.start_with?("@")
-      system "install_name_tool", "-change", old_dylib,
-             "@loader_path/../lib/#{File.basename(old_dylib)}", bundled_ruby
-    end
-
-    # Patch shebangs in all ruby wrapper scripts to point to the installed ruby.
-    Pathname.glob("#{ruby_runtime}/bin/*").each do |f|
-      next if f.symlink? || !f.file?
-      content = f.read
-      next unless content.match?(/\A#!.*ruby/)
-      f.write content.sub(/\A#!.*/, "#!#{bundled_ruby}")
+    # Relocate the runtime to this Cellar path (fix dylib load path + shebangs).
+    # Tarballs built by the current workflow bundle relocate-runtime.sh; the
+    # inline fallback handles runtimes built before the script was introduced.
+    if (ruby_runtime / "relocate-runtime.sh").exist?
+      system "bash", ruby_runtime / "relocate-runtime.sh", ruby_runtime
+    else
+      old_dylib = Utils.safe_popen_read("otool", "-L", bundled_ruby.to_s).lines
+        .map { |l| l.strip.split.first }
+        .find { |p| p =~ /libruby\.\d+\.\d+\.dylib$/ }
+      if old_dylib && !old_dylib.start_with?("@")
+        system "install_name_tool", "-change", old_dylib,
+               "@loader_path/../lib/#{File.basename(old_dylib)}", bundled_ruby
+      end
+      Pathname.glob("#{ruby_runtime}/bin/*").each do |f|
+        next if f.symlink? || !f.file?
+        content = f.read
+        next unless content.match?(/\A#!.*ruby/)
+        f.write content.sub(/\A#!.*/, "#!#{bundled_ruby}")
+      end
     end
 
     ENV["GEM_HOME"] = gem_home

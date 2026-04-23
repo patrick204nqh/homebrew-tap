@@ -67,21 +67,22 @@ jobs:
           orig_prefix=$("$ruby" -e "puts RbConfig::CONFIG['prefix']")
           ruby .github/scripts/patch-rbconfig.rb "$rbconfig" "$orig_prefix"
 
-          # 2. Fix the ruby binary's dylib load path from the absolute CI build
-          #    path to @loader_path-relative so the binary works anywhere.
-          lib_name=$(otool -L "$ruby" | awk '/libruby\.[0-9]+\.[0-9]+\.dylib/ {print $1}' | xargs basename 2>/dev/null || true)
+          # 2. Fix the dylib load path permanently (survives any extraction path)
           old_dylib=$(otool -L "$ruby" | awk '/libruby\.[0-9]+\.[0-9]+\.dylib/ {print $1}')
-          if [ -n "$old_dylib" ]; then
-            install_name_tool -change "$old_dylib" "@loader_path/../lib/${lib_name}" "$ruby"
-            install_name_tool -id "@rpath/${lib_name}" "$INSTALL_DIR/lib/${lib_name}"
-          fi
+          lib_name=$(basename "$old_dylib")
+          install_name_tool -change "$old_dylib" "@loader_path/../lib/${lib_name}" "$ruby"
 
-          # 3. Replace hardcoded shebangs in wrapper scripts with a portable
-          #    placeholder; Homebrew formulas patch these to the installed ruby.
-          find "$INSTALL_DIR/bin" -type f | while read -r f; do
+          # 3. Set a portable shebang placeholder in all wrapper scripts.
+          #    Homebrew formulas call relocate-runtime.sh to finalise to the
+          #    Cellar path after staging.
+          find "$INSTALL_DIR/bin" -maxdepth 1 -type f | while IFS= read -r f; do
             head -c 2 "$f" | grep -q '^#!' || continue
             sed -i '' '1s|^#!.*|#!/usr/bin/env ruby|' "$f"
           done
+
+          # 4. Bundle the relocation script so formulas need no inline logic
+          cp .github/scripts/relocate-runtime.sh "$INSTALL_DIR/relocate-runtime.sh"
+          chmod +x "$INSTALL_DIR/relocate-runtime.sh"
 
       - name: Strip and archive
         run: |
