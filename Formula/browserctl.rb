@@ -8,9 +8,9 @@ class Browserctl < Formula
   license "MIT"
 
   bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-2026-04-23"
-    rebuild 3
-    sha256 cellar: :any, arm64_sequoia: "6049014245f7c33fac7abcc794a1a3094ce7e7892203d4579a4630a1d50e4d34"
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-21"
+    rebuild 4
+    sha256 cellar: :any, arm64_sequoia: "fc80c139490558c6281448aa46b63db48dedb0e2b17ef25decdf349fd8e79f6b"
   end
 
   depends_on "gmp"
@@ -27,7 +27,7 @@ class Browserctl < Formula
     url "https://github.com/patrick204nqh/homebrew-tap/releases/download/" \
         "ruby-runtime-#{RUBY_RUNTIME_VERSION}/" \
         "ruby-runtime-#{RUBY_RUNTIME_VERSION}-arm64-darwin.tar.gz"
-    sha256 "650e57ea610b5e410051d9a9b2330c4b37ef62064a6c15170b0fb87f7b6d6b9c"
+    sha256 "b6a53177deb7dd881da081801aa7a5d56800ddbf7e949db2e44470790381c14b"
   end
 
   # nokogiri — precompiled arm64 platform gem (avoids needing libxml2/libxslt)
