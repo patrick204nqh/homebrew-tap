@@ -68,9 +68,10 @@ jobs:
         id: meta
         env:
           FORMULA: ${{ matrix.formula }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           version=$(brew info --json "$TAP/$FORMULA" | jq -r '.[0].versions.stable')
-          tag="tap-$(date -u +%Y-%m-%d)"
+          tag="tap-pr-${PR_NUMBER}"
           root_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}"
           echo "version=$version"   >> "$GITHUB_OUTPUT"
           echo "tag=$tag"           >> "$GITHUB_OUTPUT"
