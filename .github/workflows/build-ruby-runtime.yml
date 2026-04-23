@@ -111,13 +111,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           TAG="ruby-runtime-${RUBY_VERSION}"
 
           # Discover which formulas reference this runtime — no hardcoding needed.
           consumers=$(grep -rl 'resource "ruby-runtime"' Formula/*.rb \
-            | xargs -I{} basename {} .rb \
-            | paste -sd',' \
-            | sed 's/,/, /g') || consumers=""
+            | while read -r f; do basename "$f" .rb; done \
+            | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g') || consumers=""
 
           if ! gh release view "$TAG" &>/dev/null; then
             gh release create "$TAG" \

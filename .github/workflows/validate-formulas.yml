@@ -69,6 +69,7 @@ jobs:
         env:
           FORMULAS: ${{ needs.detect.outputs.formulas }}
         run: |
+          set -euo pipefail
           echo "$FORMULAS" | jq -r '.[]' | while read -r name; do
             echo "--- $name ---"
             brew audit --strict "$TAP/$name"

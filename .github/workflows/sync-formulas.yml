@@ -22,14 +22,7 @@ jobs:
 
       - name: Compute snapshot tag
         id: tag
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          if [ "$EVENT_NAME" = "schedule" ]; then
-            echo "snapshot_tag=tap-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
-          else
-            echo "snapshot_tag=tap-$(date -u +%Y-%m-%dT%H-%M)" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "snapshot_tag=tap-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
       - name: Collect formula targets
         id: check

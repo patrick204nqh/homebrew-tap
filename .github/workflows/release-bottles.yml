@@ -36,6 +36,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SNAPSHOT_TAG: ${{ inputs.snapshot_tag }}
         run: |
+          set -euo pipefail
           if gh release view "$SNAPSHOT_TAG" &>/dev/null; then
             echo "Release $SNAPSHOT_TAG already exists."
             exit 0
@@ -113,6 +114,7 @@ jobs:
       - name: Collect formula versions
         id: versions
         run: |
+          set -euo pipefail
           notes=""
           for formula in Formula/*.rb; do
             name=$(basename "$formula" .rb)
@@ -136,6 +138,7 @@ jobs:
           SNAPSHOT_NOTES: ${{ steps.versions.outputs.notes }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
+          set -euo pipefail
           body=$(printf '## Formula versions\n\n%s\n---\n*Triggered by: %s.*' "$SNAPSHOT_NOTES" "$EVENT_NAME")
           gh release edit "$SNAPSHOT_TAG" \
             --notes "$body" \
@@ -162,9 +165,10 @@ jobs:
         env:
           FORMULA: ${{ matrix.formula }}
         run: |
-          brew tap patrick204nqh/tap
-          brew install "patrick204nqh/tap/$FORMULA"
-          brew info --json "patrick204nqh/tap/$FORMULA" \
+          set -euo pipefail
+          brew tap "$TAP"
+          brew install "$TAP/$FORMULA"
+          brew info --json "$TAP/$FORMULA" \
             | jq -e '.[0].installed[0].poured_from_bottle == true' \
             || { echo "ERROR: $FORMULA was not installed from a bottle"; exit 1; }
-          brew test "patrick204nqh/tap/$FORMULA"
+          brew test "$TAP/$FORMULA"
