@@ -8,9 +8,9 @@ class SumologicQuery < Formula
   license "MIT"
 
   bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/sumologic-query-v1.4.2"
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-2026-04-23"
     rebuild 4
-    sha256 cellar: :any, arm64_sequoia: "2127d2716bf1a9676d651fbf5c3778f617bb9bb1f513ea6da649f7305fd11e4a"
+    sha256 cellar: :any, arm64_sequoia: "22fb0ca13e42e8e1a9bb1b0d31fac1da584ea5b7acbe6dbc51065516d31f7ef1"
   end
 
   depends_on "gmp"
