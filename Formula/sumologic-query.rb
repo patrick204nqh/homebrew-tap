@@ -111,13 +111,15 @@ class SumologicQuery < Formula
   end
 
   def fix_script_shebangs(ruby_runtime, bundled_ruby)
+    shebang = "#!#{bundled_ruby}".b
     Pathname.glob("#{ruby_runtime}/bin/*").each do |f|
       next if f.symlink? || !f.file?
 
-      content = f.read
-      next unless content.match?(/\A#!.*ruby/)
+      raw = f.binread
+      next unless raw.start_with?("#!")
+      next unless raw[0, raw.index("\n") || raw.size].include?("ruby")
 
-      f.atomic_write content.sub(/\A#!.*/, "#!#{bundled_ruby}")
+      f.atomic_write raw.sub(/\A#![^\n]*/n, shebang)
     end
   end
 end
