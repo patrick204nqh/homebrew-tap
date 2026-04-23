@@ -15,8 +15,7 @@ abort "ERROR: #{rbconfig_path} not found" unless File.exist?(rbconfig_path)
 relocation_block = <<~RUBY
 
   # --- runtime relocation patch (added by patch-rbconfig.rb) ---
-  _bin_dir = File.expand_path("../../bin", __FILE__)
-  _prefix  = File.expand_path("../../..", _bin_dir)
+  _prefix = File.expand_path("../../../..", __dir__)
   CONFIG.each_value            { |v| v.gsub!(#{build_prefix.inspect}, _prefix) rescue nil }
   MAKEFILE_CONFIG.each_value   { |v| v.gsub!(#{build_prefix.inspect}, _prefix) rescue nil }
   # --- end patch ---
