@@ -51,6 +51,8 @@ jobs:
         run: brew install ruby-build
 
       - name: Build Ruby ${{ inputs.ruby_version }}
+        env:
+          RUBY_CONFIGURE_OPTS: --enable-load-relative
         run: |
           set -euo pipefail
           ruby-build "$RUBY_VERSION" "$(pwd)/ruby-runtime"
