@@ -7,6 +7,12 @@ class SumologicQuery < Formula
   sha256 "4282fc7daa74ffd3a4d37bf87447b1282cd3ec7ee4217f63bd17a84592610620"
   license "MIT"
 
+  bottle do
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/sumologic-query-1.4.2"
+    rebuild 1
+    sha256 cellar: :any, arm64_sequoia: "8abbc9a4480be35cafb3fb7bd8116b3069ddcf373a207aa4ae53660488e3a0ff"
+  end
+
   depends_on "gmp"
 
   # Shared relocatable Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
