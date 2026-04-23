@@ -84,26 +84,7 @@ class Browserctl < Formula
     bundled_gem  = ruby_runtime / "bin/gem"
     gem_home     = libexec / "gems"
 
-    # Relocate the runtime to this Cellar path (fix dylib load path + shebangs).
-    # Tarballs built by the current workflow bundle relocate-runtime.sh; the
-    # inline fallback handles runtimes built before the script was introduced.
-    if (ruby_runtime / "relocate-runtime.sh").exist?
-      system "bash", ruby_runtime / "relocate-runtime.sh", ruby_runtime
-    else
-      old_dylib = Utils.safe_popen_read("otool", "-L", bundled_ruby.to_s).lines
-        .map { |l| l.strip.split.first }
-        .find { |p| p =~ /libruby\.\d+\.\d+\.dylib$/ }
-      if old_dylib && !old_dylib.start_with?("@")
-        system "install_name_tool", "-change", old_dylib,
-               "@loader_path/../lib/#{File.basename(old_dylib)}", bundled_ruby
-      end
-      Pathname.glob("#{ruby_runtime}/bin/*").each do |f|
-        next if f.symlink? || !f.file?
-        content = f.read
-        next unless content.match?(/\A#!.*ruby/)
-        f.write content.sub(/\A#!.*/, "#!#{bundled_ruby}")
-      end
-    end
+    relocate_runtime(ruby_runtime, bundled_ruby)
 
     ENV["GEM_HOME"] = gem_home
 
@@ -175,5 +156,40 @@ class Browserctl < Formula
 
   test do
     assert_match "Usage: browserctl", shell_output("#{bin}/browserctl --help 2>&1")
+  end
+
+  private
+
+  def relocate_runtime(ruby_runtime, bundled_ruby)
+    if (ruby_runtime / "relocate-runtime.sh").exist?
+      system "bash", ruby_runtime / "relocate-runtime.sh", ruby_runtime
+      return
+    end
+
+    fix_dylib_path(bundled_ruby)
+    fix_script_shebangs(ruby_runtime, bundled_ruby)
+  end
+
+  def fix_dylib_path(ruby_bin)
+    otool_out = Utils.safe_popen_read("otool", "-L", ruby_bin.to_s)
+    old_dylib = otool_out.lines
+                         .map { |l| l.strip.split.first }
+                         .find { |p| p&.match?(/libruby\.\d+\.\d+\.dylib$/) }
+    return if old_dylib.nil? || old_dylib.start_with?("@")
+
+    MachO::Tools.change_install_name(
+      ruby_bin.to_s, old_dylib, "@loader_path/../lib/#{File.basename(old_dylib)}"
+    )
+  end
+
+  def fix_script_shebangs(ruby_runtime, bundled_ruby)
+    Pathname.glob("#{ruby_runtime}/bin/*").each do |f|
+      next if f.symlink? || !f.file?
+
+      content = f.read
+      next unless content.match?(/\A#!.*ruby/)
+
+      f.write content.sub(/\A#!.*/, "#!#{bundled_ruby}")
+    end
   end
 end
