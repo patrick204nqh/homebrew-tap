@@ -34,5 +34,5 @@ jobs:
         env:
           FORMULA: ${{ matrix.formula }}
         run: |
-          brew install "$TAP/$FORMULA"
+          brew install --build-from-source "$TAP/$FORMULA"
           brew test "$TAP/$FORMULA"
