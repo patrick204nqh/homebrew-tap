@@ -94,13 +94,15 @@ flowchart TD
     BUILD[build\nruby-build VERSION]
     PATCH[patch\nrbconfig relocatable]
     ARCHIVE[archive\ntar + sha256]
-    UPLOAD[upload\ngh release]
+    UPLOAD[upload\ngh release ruby-runtime-X.Y.Z]
+    PR[open PR\nupdate sha256 in all formulas]
 
-    T --> VALIDATE --> BUILD --> PATCH --> ARCHIVE --> UPLOAD
+    T --> VALIDATE --> BUILD --> PATCH --> ARCHIVE --> UPLOAD --> PR
 
     style VALIDATE fill:#dbeafe,stroke:#93c5fd
     style BUILD    fill:#dcfce7,stroke:#86efac
     style PATCH    fill:#dcfce7,stroke:#86efac
     style ARCHIVE  fill:#dcfce7,stroke:#86efac
     style UPLOAD   fill:#dcfce7,stroke:#86efac
+    style PR       fill:#fef9c3,stroke:#fde047
 ```
