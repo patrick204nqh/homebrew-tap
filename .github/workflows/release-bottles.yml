@@ -88,6 +88,7 @@ jobs:
         with:
           formula_name: ${{ matrix.formula }}
           version: ${{ env.VERSION }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload bottle to snapshot release
         env:
