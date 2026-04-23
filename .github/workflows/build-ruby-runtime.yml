@@ -73,7 +73,7 @@ jobs:
           install_name_tool -change "$old_dylib" "@loader_path/../lib/${lib_name}" "$ruby"
 
           # 3. Set a portable shebang placeholder in all wrapper scripts.
-          #    Homebrew formulas call relocate-runtime.sh to finalise to the
+          #    Homebrew formulas call relocate-runtime.rb to finalise to the
           #    Cellar path after staging.
           find "$INSTALL_DIR/bin" -maxdepth 1 -type f | while IFS= read -r f; do
             head -c 2 "$f" | grep -q '^#!' || continue
@@ -81,8 +81,8 @@ jobs:
           done
 
           # 4. Bundle the relocation script so formulas need no inline logic
-          cp .github/scripts/relocate-runtime.sh "$INSTALL_DIR/relocate-runtime.sh"
-          chmod +x "$INSTALL_DIR/relocate-runtime.sh"
+          cp .github/scripts/relocate-runtime.rb "$INSTALL_DIR/relocate-runtime.rb"
+          chmod +x "$INSTALL_DIR/relocate-runtime.rb"
 
       - name: Strip and archive
         run: |

@@ -84,7 +84,7 @@ class Browserctl < Formula
     bundled_gem  = ruby_runtime / "bin/gem"
     gem_home     = libexec / "gems"
 
-    relocate_runtime(ruby_runtime, bundled_ruby)
+    relocate_runtime(ruby_runtime)
 
     ENV["GEM_HOME"] = gem_home
 
@@ -160,38 +160,7 @@ class Browserctl < Formula
 
   private
 
-  def relocate_runtime(ruby_runtime, bundled_ruby)
-    if (ruby_runtime / "relocate-runtime.sh").exist?
-      system "bash", ruby_runtime / "relocate-runtime.sh", ruby_runtime
-      return
-    end
-
-    fix_dylib_path(bundled_ruby)
-    fix_script_shebangs(ruby_runtime, bundled_ruby)
-  end
-
-  def fix_dylib_path(ruby_bin)
-    otool_out = Utils.safe_popen_read("otool", "-L", ruby_bin.to_s)
-    old_dylib = otool_out.lines
-                         .map { |l| l.strip.split.first }
-                         .find { |p| p&.match?(/libruby\.\d+\.\d+\.dylib$/) }
-    return if old_dylib.nil? || old_dylib.start_with?("@")
-
-    MachO::Tools.change_install_name(
-      ruby_bin.to_s, old_dylib, "@loader_path/../lib/#{File.basename(old_dylib)}"
-    )
-  end
-
-  def fix_script_shebangs(ruby_runtime, bundled_ruby)
-    shebang = "#!#{bundled_ruby}".b
-    Pathname.glob("#{ruby_runtime}/bin/*").each do |f|
-      next if f.symlink? || !f.file?
-
-      raw = f.binread
-      next unless raw.start_with?("#!")
-      next unless raw[0, raw.index("\n") || raw.size].include?("ruby")
-
-      f.atomic_write raw.sub(/\A#![^\n]*/n, shebang)
-    end
+  def relocate_runtime(ruby_runtime)
+    system "ruby", (ruby_runtime / "relocate-runtime.rb").to_s, ruby_runtime.to_s
   end
 end
