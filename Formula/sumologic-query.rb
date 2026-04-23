@@ -10,7 +10,7 @@ class SumologicQuery < Formula
   bottle do
     root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-2026-04-23"
     rebuild 4
-    sha256 cellar: :any, arm64_sequoia: "22fb0ca13e42e8e1a9bb1b0d31fac1da584ea5b7acbe6dbc51065516d31f7ef1"
+    sha256 cellar: :any, arm64_sequoia: "2720ad6f16efa562e71a1c321a48f24ae7ee1263d6c85c696fd4adbb1f46e1cd"
   end
 
   depends_on "gmp"
