@@ -1,14 +1,20 @@
 flowchart TD
-    T([push: main / workflow_dispatch])
+    T([push: main Formula/** / workflow_dispatch])
 
     VALIDATE[validate\nlint · detect · audit\nreusable workflow]
+    PREPARE[prepare\ncreate draft tap-YYYY-MM-DD release]
     BUILD[build-and-publish\nmatrix per formula]
+    FINALIZE[finalize\npublish snapshot release]
     SKIP([skip])
 
     T --> VALIDATE
-    VALIDATE -->|formulas changed, not bot| BUILD
+    VALIDATE -->|formulas changed, not bot| PREPARE
     VALIDATE -->|nothing changed| SKIP
+    PREPARE --> BUILD
+    BUILD --> FINALIZE
 
     style VALIDATE fill:#dbeafe,stroke:#93c5fd
+    style PREPARE  fill:#dbeafe,stroke:#93c5fd
     style BUILD    fill:#dcfce7,stroke:#86efac
+    style FINALIZE fill:#dbeafe,stroke:#93c5fd
     style SKIP     fill:#f3f4f6,stroke:#d1d5db

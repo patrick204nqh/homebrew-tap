@@ -4,7 +4,7 @@ flowchart TD
     DETECT[detect\ncheck upstream versions]
     CREATE[create-release\ndraft]
     BUILD[update-and-build\nmatrix per formula]
-    TAG[tag-snapshot\npublish]
+    TAG[finalize\npublish snapshot release]
     SKIP([skip])
 
     T --> DETECT
