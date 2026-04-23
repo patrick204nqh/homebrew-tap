@@ -17,31 +17,9 @@ jobs:
       mode: pr
       base_ref: ${{ github.base_ref }}
 
-  install:
-    name: Install / ${{ matrix.formula }}
-    needs: validate
-    if: needs.validate.result == 'success' && needs.validate.outputs.formulas != '[]'
-    runs-on: macos-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: true
-      matrix:
-        formula: ${{ fromJson(needs.validate.outputs.formulas) }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-tap
-      - name: Install from source and test
-        env:
-          FORMULA: ${{ matrix.formula }}
-        run: |
-          brew install --build-from-source "$TAP/$FORMULA"
-          brew test "$TAP/$FORMULA"
-
   bottle:
     name: Bottle / ${{ matrix.formula }}
-    needs: [validate, install]
+    needs: validate
     if: needs.validate.result == 'success' && needs.validate.outputs.formulas != '[]'
     runs-on: macos-latest
     timeout-minutes: 60

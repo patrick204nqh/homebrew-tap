@@ -7,16 +7,17 @@ PR — nothing is committed directly to `main` by bots.
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
-| [`ci.yml`](.github/workflows/ci.yml) | Pull request to `main` | Lint · audit · install from source · build bottle · smoke-test from bottle |
+| [`ci.yml`](.github/workflows/ci.yml) | Pull request to `main` | Lint · audit · build bottle (installs from source as part of bottling) · smoke-test from bottle |
 | [`release.yml`](.github/workflows/release.yml) | Push to `main` (Formula/** only) | Publish the prerelease bottle built during PR CI |
 | [`sync-formulas.yml`](.github/workflows/sync-formulas.yml) | Weekly schedule (Sun 23:00 UTC) · manual dispatch | Detect new upstream versions · open a PR with updated formulas |
 | [`build-ruby-runtime.yml`](.github/workflows/build-ruby-runtime.yml) | Manual dispatch only | Build a relocatable arm64 Ruby runtime · publish to `ruby-runtime-X.Y.Z` release · open PR to update sha256 in all formulas |
 
 **PR flow:** `ci.yml` does everything needed to prove a formula is releasable —
-lint, audit, install from source, build the bottle, and smoke-test the install
-from that bottle. The bottle block (with its sha256) is committed back to the
-PR branch so the merged formula is complete. On merge, `release.yml` simply
-publishes the already-verified prerelease. No bottle is built post-merge.
+lint, audit, build the bottle (which installs from source and runs `brew test`
+as part of bottling), and smoke-test the install from that bottle. The bottle
+block (with its sha256) is committed back to the PR branch so the merged formula
+is complete. On merge, `release.yml` simply publishes the already-verified
+prerelease. No bottle is built post-merge.
 
 See [CI pipeline diagrams](docs/architecture/diagrams/ci-pipelines.md) for visual flowcharts.
 

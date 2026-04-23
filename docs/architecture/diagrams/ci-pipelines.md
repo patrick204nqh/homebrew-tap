@@ -10,19 +10,16 @@ flowchart TD
     T([pull_request → main\nopened · synchronize · reopened])
 
     VALIDATE[Validate\nlint · detect · audit\nreusable workflow]
-    INSTALL[Install / formula\nbrew install --build-from-source\nbrew test]
-    BOTTLE[Bottle / formula\nbrew install --build-bottle\nbrew bottle · upload to prerelease\ncommit bottle block to PR branch]
+    BOTTLE[Bottle / formula\nbrew install --build-bottle · brew test\nbrew bottle · upload to prerelease\ncommit bottle block to PR branch]
     SMOKE[Smoke Test / formula\nbrew install from prerelease bottle\npoured_from_bottle · brew test]
     SKIP([skip — no formula changes])
 
     T --> VALIDATE
-    VALIDATE -->|formulas changed| INSTALL
+    VALIDATE -->|formulas changed| BOTTLE
     VALIDATE -->|nothing changed| SKIP
-    INSTALL --> BOTTLE
     BOTTLE --> SMOKE
 
     style VALIDATE fill:#dbeafe,stroke:#93c5fd
-    style INSTALL  fill:#dcfce7,stroke:#86efac
     style BOTTLE   fill:#dcfce7,stroke:#86efac
     style SMOKE    fill:#fef9c3,stroke:#fde047
     style SKIP     fill:#f3f4f6,stroke:#d1d5db
