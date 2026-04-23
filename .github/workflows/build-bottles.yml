@@ -52,8 +52,9 @@ jobs:
   build-and-publish:
     name: Build / ${{ matrix.formula }}
     needs: [validate, prepare]
+    if: github.actor != 'github-actions[bot]' && needs.validate.outputs.formulas != '[]'
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     concurrency:
       group: bottle-publish-ci-${{ github.ref }}
       cancel-in-progress: false
@@ -140,4 +141,7 @@ jobs:
         run: |
           brew tap patrick204nqh/tap
           brew install "patrick204nqh/tap/$FORMULA"
+          brew info --json "patrick204nqh/tap/$FORMULA" \
+            | jq -e '.[0].installed[0].poured_from_bottle == true' \
+            || { echo "ERROR: $FORMULA was not installed from a bottle"; exit 1; }
           brew test "patrick204nqh/tap/$FORMULA"

@@ -206,7 +206,7 @@ jobs:
   tag-snapshot:
     name: Finalize Snapshot
     needs: [detect, create-release, update-and-build]
-    if: "!cancelled() && needs.update-and-build.result != 'failure'"
+    if: needs.update-and-build.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -282,4 +282,7 @@ jobs:
         run: |
           brew tap patrick204nqh/tap
           brew install "patrick204nqh/tap/$FORMULA"
+          brew info --json "patrick204nqh/tap/$FORMULA" \
+            | jq -e '.[0].installed[0].poured_from_bottle == true' \
+            || { echo "ERROR: $FORMULA was not installed from a bottle"; exit 1; }
           brew test "patrick204nqh/tap/$FORMULA"
