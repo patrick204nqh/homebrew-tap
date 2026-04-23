@@ -1,20 +1,17 @@
 flowchart TD
     T([cron Sun 23:00 UTC / workflow_dispatch])
 
-    DETECT[detect\ncheck upstream versions]
-    CREATE[create-release\ndraft]
-    BUILD[update-and-build\nmatrix per formula]
-    TAG[finalize\npublish snapshot release]
+    DETECT[detect\ncheck upstream versions\noutput formula_names + snapshot_tag]
+    UPDATE[update-formulas\nbatch version + sha256 updates\nsingle commit to main]
+    RELEASE[release\ncalls release-bottles.yml]
     SKIP([skip])
 
     T --> DETECT
-    DETECT -->|updates found| CREATE
+    DETECT -->|updates found| UPDATE
     DETECT -->|nothing to update| SKIP
-    CREATE --> BUILD
-    BUILD --> TAG
+    UPDATE --> RELEASE
 
-    style DETECT fill:#dbeafe,stroke:#93c5fd
-    style CREATE fill:#dbeafe,stroke:#93c5fd
-    style BUILD  fill:#dcfce7,stroke:#86efac
-    style TAG    fill:#dbeafe,stroke:#93c5fd
-    style SKIP   fill:#f3f4f6,stroke:#d1d5db
+    style DETECT  fill:#dbeafe,stroke:#93c5fd
+    style UPDATE  fill:#dbeafe,stroke:#93c5fd
+    style RELEASE fill:#dcfce7,stroke:#86efac
+    style SKIP    fill:#f3f4f6,stroke:#d1d5db

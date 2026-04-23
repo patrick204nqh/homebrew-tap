@@ -7,9 +7,6 @@ on:
       - 'Formula/**'
   workflow_dispatch:
 
-env:
-  TAP: patrick204nqh/tap
-
 jobs:
   validate:
     name: Validate
@@ -18,130 +15,25 @@ jobs:
       mode: push
 
   prepare:
-    name: Prepare Snapshot Release
+    name: Prepare
     needs: validate
     if: github.actor != 'github-actions[bot]' && needs.validate.outputs.formulas != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      contents: write
     outputs:
       snapshot_tag: ${{ steps.tag.outputs.snapshot_tag }}
     steps:
-      - uses: actions/checkout@v4
-
       - name: Compute snapshot tag
         id: tag
         run: echo "snapshot_tag=tap-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
-      - name: Create draft release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SNAPSHOT_TAG: ${{ steps.tag.outputs.snapshot_tag }}
-        run: |
-          if gh release view "$SNAPSHOT_TAG" &>/dev/null; then
-            echo "Release $SNAPSHOT_TAG already exists."
-            exit 0
-          fi
-          gh release create "$SNAPSHOT_TAG" \
-            --title "$SNAPSHOT_TAG" \
-            --prerelease \
-            --draft \
-            --notes "Building..."
-
-  build-and-publish:
-    name: Build / ${{ matrix.formula }}
+  release:
+    name: Release
     needs: [validate, prepare]
     if: github.actor != 'github-actions[bot]' && needs.validate.outputs.formulas != '[]'
-    runs-on: macos-latest
-    timeout-minutes: 45
-    concurrency:
-      group: bottle-publish-ci-${{ github.ref }}
-      cancel-in-progress: false
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        formula: ${{ fromJson(needs.validate.outputs.formulas) }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-tap
-
-      - name: Install for bottling
-        env:
-          FORMULA: ${{ matrix.formula }}
-        run: |
-          brew install --build-bottle "$TAP/$FORMULA"
-          brew test "$TAP/$FORMULA"
-
-      - name: Build bottle
-        env:
-          FORMULA: ${{ matrix.formula }}
-          SNAPSHOT_TAG: ${{ needs.prepare.outputs.snapshot_tag }}
-        run: |
-          version=$(brew info --json "$TAP/$FORMULA" | jq -r '.[0].versions.stable')
-          echo "VERSION=$version" >> "$GITHUB_ENV"
-          brew bottle --json \
-            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/$SNAPSHOT_TAG" \
-            "$TAP/$FORMULA"
-
-      - name: Merge bottle
-        uses: ./.github/actions/merge-bottle
-        with:
-          formula_name: ${{ matrix.formula }}
-          version: ${{ env.VERSION }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload bottle to snapshot release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SNAPSHOT_TAG: ${{ needs.prepare.outputs.snapshot_tag }}
-        run: |
-          gh release upload "$SNAPSHOT_TAG" "$BOTTLE_FILE" --clobber
-
-  finalize:
-    name: Finalize Snapshot
-    needs: [prepare, build-and-publish]
-    if: needs.build-and-publish.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - name: Publish snapshot release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SNAPSHOT_TAG: ${{ needs.prepare.outputs.snapshot_tag }}
-        run: |
-          gh release edit "$SNAPSHOT_TAG" \
-            --draft=false \
-            --prerelease=false
-
-  smoke-test:
-    name: Smoke Test / ${{ matrix.formula }}
-    needs: [validate, finalize]
-    if: needs.finalize.result == 'success'
-    runs-on: macos-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        formula: ${{ fromJson(needs.validate.outputs.formulas) }}
-    steps:
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@675fcd27b59e54d310c5484c8c27c01d03da660c
-
-      - name: Install from bottle and test
-        env:
-          FORMULA: ${{ matrix.formula }}
-        run: |
-          brew tap patrick204nqh/tap
-          brew install "patrick204nqh/tap/$FORMULA"
-          brew info --json "patrick204nqh/tap/$FORMULA" \
-            | jq -e '.[0].installed[0].poured_from_bottle == true' \
-            || { echo "ERROR: $FORMULA was not installed from a bottle"; exit 1; }
-          brew test "patrick204nqh/tap/$FORMULA"
+    uses: ./.github/workflows/release-bottles.yml
+    with:
+      formulas: ${{ needs.validate.outputs.formulas }}
+      snapshot_tag: ${{ needs.prepare.outputs.snapshot_tag }}
+    secrets:
+      github_token: ${{ secrets.GITHUB_TOKEN }}

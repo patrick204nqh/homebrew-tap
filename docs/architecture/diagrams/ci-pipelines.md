@@ -7,24 +7,18 @@ flowchart TD
     T([push: main Formula/** / workflow_dispatch])
 
     VALIDATE[validate\nlint · detect · audit\nreusable workflow]
-    PREPARE[prepare\ncreate draft tap-YYYY-MM-DD release]
-    BUILD[build-and-publish\nmatrix per formula]
-    FINALIZE[finalize\npublish snapshot release]
-    SMOKE[smoke-test\nbrew tap · brew install · brew test]
+    PREPARE[prepare\ncompute tap-YYYY-MM-DD tag]
+    RELEASE[release\ncalls release-bottles.yml]
     SKIP([skip])
 
     T --> VALIDATE
     VALIDATE -->|formulas changed, not bot| PREPARE
     VALIDATE -->|nothing changed| SKIP
-    PREPARE --> BUILD
-    BUILD --> FINALIZE
-    FINALIZE --> SMOKE
+    PREPARE --> RELEASE
 
     style VALIDATE fill:#dbeafe,stroke:#93c5fd
     style PREPARE  fill:#dbeafe,stroke:#93c5fd
-    style BUILD    fill:#dcfce7,stroke:#86efac
-    style FINALIZE fill:#dbeafe,stroke:#93c5fd
-    style SMOKE    fill:#fef9c3,stroke:#fde047
+    style RELEASE  fill:#dcfce7,stroke:#86efac
     style SKIP     fill:#f3f4f6,stroke:#d1d5db
 ```
 
@@ -53,29 +47,44 @@ flowchart TD
 flowchart TD
     T([cron Sun 23:00 UTC / workflow_dispatch])
 
-    DETECT[detect\ncheck upstream versions]
-    CREATE[create-release\ndraft]
-    BUILD[update-and-build\nmatrix per formula]
-    TAG[tag-snapshot\npublish snapshot release]
-    SMOKE[smoke-test\nbrew tap · brew install · brew test]
+    DETECT[detect\ncheck upstream versions\noutput formula_names + snapshot_tag]
+    UPDATE[update-formulas\nbatch version + sha256 updates\nsingle commit to main]
+    RELEASE[release\ncalls release-bottles.yml]
     SKIP([skip])
 
     T --> DETECT
-    DETECT -->|updates found| CREATE
+    DETECT -->|updates found| UPDATE
     DETECT -->|nothing to update| SKIP
-    CREATE --> BUILD
-    BUILD --> TAG
-    TAG --> SMOKE
+    UPDATE --> RELEASE
 
-    style DETECT fill:#dbeafe,stroke:#93c5fd
-    style CREATE fill:#dbeafe,stroke:#93c5fd
-    style BUILD  fill:#dcfce7,stroke:#86efac
-    style TAG    fill:#dbeafe,stroke:#93c5fd
-    style SMOKE  fill:#fef9c3,stroke:#fde047
-    style SKIP   fill:#f3f4f6,stroke:#d1d5db
+    style DETECT  fill:#dbeafe,stroke:#93c5fd
+    style UPDATE  fill:#dbeafe,stroke:#93c5fd
+    style RELEASE fill:#dcfce7,stroke:#86efac
+    style SKIP    fill:#f3f4f6,stroke:#d1d5db
 ```
 
-## 4. Build Ruby Runtime — Manual
+## 4. Release Bottles — Reusable
+
+_Called by Build Bottles and Sync Formulas._
+
+```mermaid
+flowchart TD
+    IN([inputs: formulas · snapshot_tag])
+
+    PREPARE[prepare\ncreate draft tap-YYYY-MM-DD release]
+    BUILD[build\nmatrix per formula\ninstall · bottle · merge · upload]
+    FINALIZE[finalize\npublish release with formula versions]
+    SMOKE[smoke-test\nmatrix per formula\nbrew tap · brew install · poured_from_bottle · brew test]
+
+    IN --> PREPARE --> BUILD --> FINALIZE --> SMOKE
+
+    style PREPARE  fill:#dbeafe,stroke:#93c5fd
+    style BUILD    fill:#dcfce7,stroke:#86efac
+    style FINALIZE fill:#dbeafe,stroke:#93c5fd
+    style SMOKE    fill:#fef9c3,stroke:#fde047
+```
+
+## 5. Build Ruby Runtime — Manual
 
 ```mermaid
 flowchart TD
