@@ -3,6 +3,8 @@ name: Build Bottles
 on:
   push:
     branches: [main]
+    paths:
+      - 'Formula/**'
   workflow_dispatch:
 
 env:
@@ -15,11 +17,41 @@ jobs:
     with:
       mode: push
 
+  prepare:
+    name: Prepare Snapshot Release
+    needs: validate
+    if: github.actor != 'github-actions[bot]' && needs.validate.outputs.formulas != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      snapshot_tag: ${{ steps.tag.outputs.snapshot_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute snapshot tag
+        id: tag
+        run: echo "snapshot_tag=tap-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SNAPSHOT_TAG: ${{ steps.tag.outputs.snapshot_tag }}
+        run: |
+          if gh release view "$SNAPSHOT_TAG" &>/dev/null; then
+            echo "Release $SNAPSHOT_TAG already exists."
+            exit 0
+          fi
+          gh release create "$SNAPSHOT_TAG" \
+            --title "$SNAPSHOT_TAG" \
+            --prerelease \
+            --draft \
+            --notes "Building..."
+
   build-and-publish:
     name: Build / ${{ matrix.formula }}
-    needs: validate
-    # Bot commits carry [skip ci]; actor check is a secondary guard.
-    if: github.actor != 'github-actions[bot]' && needs.validate.outputs.formulas != '[]'
+    needs: [validate, prepare]
     runs-on: macos-latest
     timeout-minutes: 30
     concurrency:
@@ -38,7 +70,6 @@ jobs:
 
       - name: Install for bottling
         env:
-          TAP: ${{ env.TAP }}
           FORMULA: ${{ matrix.formula }}
         run: |
           brew install --build-bottle "$TAP/$FORMULA"
@@ -46,13 +77,13 @@ jobs:
 
       - name: Build bottle
         env:
-          TAP: ${{ env.TAP }}
           FORMULA: ${{ matrix.formula }}
+          SNAPSHOT_TAG: ${{ needs.prepare.outputs.snapshot_tag }}
         run: |
           version=$(brew info --json "$TAP/$FORMULA" | jq -r '.[0].versions.stable')
           echo "VERSION=$version" >> "$GITHUB_ENV"
           brew bottle --json \
-            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/$FORMULA-${version}" \
+            --root-url "https://github.com/patrick204nqh/homebrew-tap/releases/download/$SNAPSHOT_TAG" \
             "$TAP/$FORMULA"
 
       - name: Merge bottle
@@ -62,32 +93,27 @@ jobs:
           version: ${{ env.VERSION }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to GitHub Release
+      - name: Upload bottle to snapshot release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FORMULA: ${{ matrix.formula }}
+          SNAPSHOT_TAG: ${{ needs.prepare.outputs.snapshot_tag }}
         run: |
-          tag="$FORMULA-${{ env.VERSION }}"
-          if ! gh release view "$tag" &>/dev/null; then
-            gh release create "$tag" \
-              --title "$FORMULA v${{ env.VERSION }}" \
-              --notes "Pre-built bottles for \`$FORMULA\` v${{ env.VERSION }}"
-          fi
-          gh release view "$tag" --json assets --jq '.assets[].name' \
-            | grep '\.bottle' \
-            | grep -v "^${{ env.BOTTLE_FILE }}$" \
-            | xargs -I{} gh release delete-asset "$tag" {} --yes || true
-          gh release upload "$tag" "${{ env.BOTTLE_FILE }}" --clobber
+          gh release upload "$SNAPSHOT_TAG" "$BOTTLE_FILE" --clobber
 
-      - name: Delete stale releases
+  finalize:
+    name: Finalize Snapshot
+    needs: [prepare, build-and-publish]
+    if: needs.build-and-publish.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish snapshot release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FORMULA: ${{ matrix.formula }}
+          SNAPSHOT_TAG: ${{ needs.prepare.outputs.snapshot_tag }}
         run: |
-          current_tag="$FORMULA-${{ env.VERSION }}"
-          gh release list --limit 100 --json tagName \
-            | jq -r '.[].tagName' \
-            | grep "^$FORMULA-" \
-            | grep -v "^${current_tag}$" \
-            | grep -v "^tap-" \
-            | xargs -I{} sh -c 'gh release delete "$1" --yes --cleanup-tag || true' _ {}
+          gh release edit "$SNAPSHOT_TAG" \
+            --draft=false \
+            --prerelease=false
