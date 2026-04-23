@@ -65,7 +65,7 @@ jobs:
           FORMULA: ${{ matrix.formula }}
         run: |
           version=$(brew info --json "$TAP/$FORMULA" | jq -r '.[0].versions.stable')
-          tag="${FORMULA}-v${version}"
+          tag="tap-$(date -u +%Y-%m-%d)"
           root_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}"
           echo "version=$version"   >> "$GITHUB_OUTPUT"
           echo "tag=$tag"           >> "$GITHUB_OUTPUT"
@@ -75,14 +75,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.meta.outputs.tag }}
-          FORMULA: ${{ matrix.formula }}
-          VERSION: ${{ steps.meta.outputs.version }}
         run: |
           if ! gh release view "$TAG" &>/dev/null; then
             gh release create "$TAG" \
               --title "$TAG" \
               --prerelease \
-              --notes "Pre-release bottle for \`$FORMULA\` v$VERSION — pending PR merge."
+              --notes "Pre-release snapshot — pending PR merge."
           fi
 
       - name: Build bottle
@@ -168,30 +166,36 @@ jobs:
           mode: pr
           base_ref: ${{ github.base_ref }}
 
-      - name: Delete prereleases for abandoned PR
+      - name: Delete prerelease for abandoned PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORMULAS: ${{ steps.detect.outputs.formulas }}
         run: |
           set -euo pipefail
-          echo "$FORMULAS" | jq -r '.[]' | while read -r formula; do
-            version=$(grep -oP '(?:archive/refs/tags/v|releases/download/v)\K[0-9]+\.[0-9]+\.[0-9]+' \
-              "Formula/${formula}.rb" | head -1)
-            if [ -z "$version" ]; then
-              version=$(grep -oP '^\s+version\s+"\K[^"]+' "Formula/${formula}.rb" | head -1)
-            fi
-            tag="${formula}-v${version}"
+          # Derive the snapshot tag from the bottle block root_url written by CI.
+          # All formulas in the PR share the same tap-YYYY-MM-DD tag, so we only
+          # need to find it once.
+          tag=""
+          while IFS= read -r formula; do
+            tag=$(grep -oP 'root_url.*releases/download/\K[^"]+' \
+              "Formula/${formula}.rb" 2>/dev/null | head -1 || true)
+            [ -n "$tag" ] && break
+          done < <(echo "$FORMULAS" | jq -r '.[]')
 
-            if ! gh release view "$tag" &>/dev/null; then
-              echo "$tag: no release found, skipping."
-              continue
-            fi
+          if [ -z "$tag" ]; then
+            echo "No bottle block found in changed formulas — nothing to clean up."
+            exit 0
+          fi
 
-            is_prerelease=$(gh release view "$tag" --json isPrerelease -q '.isPrerelease')
-            if [ "$is_prerelease" = "true" ]; then
-              gh release delete "$tag" --yes --cleanup-tag
-              echo "Deleted prerelease $tag"
-            else
-              echo "$tag is already published — keeping."
-            fi
-          done
+          if ! gh release view "$tag" &>/dev/null; then
+            echo "$tag: no release found, skipping."
+            exit 0
+          fi
+
+          is_prerelease=$(gh release view "$tag" --json isPrerelease -q '.isPrerelease')
+          if [ "$is_prerelease" = "true" ]; then
+            gh release delete "$tag" --yes --cleanup-tag
+            echo "Deleted prerelease $tag"
+          else
+            echo "$tag is already published — keeping."
+          fi

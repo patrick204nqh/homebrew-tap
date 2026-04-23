@@ -52,15 +52,17 @@ jobs:
           FORMULA: ${{ matrix.formula }}
         run: |
           set -euo pipefail
-          version=$(grep -oP '(?:archive/refs/tags/v|releases/download/v)\K[0-9]+\.[0-9]+\.[0-9]+' \
-            "Formula/${FORMULA}.rb" | head -1)
-          if [ -z "$version" ]; then
-            version=$(grep -oP '^\s+version\s+"\K[^"]+' "Formula/${FORMULA}.rb" | head -1)
+          # Derive the snapshot tag from the bottle block root_url written by CI.
+          tag=$(grep -oP 'root_url.*releases/download/\K[^"]+' \
+            "Formula/${FORMULA}.rb" 2>/dev/null | head -1 || true)
+
+          if [ -z "$tag" ]; then
+            echo "No bottle block in Formula/${FORMULA}.rb — skipping (direct push without PR CI?)."
+            exit 0
           fi
-          tag="${FORMULA}-v${version}"
 
           if ! gh release view "$tag" &>/dev/null; then
-            echo "No release found for $tag — skipping (direct push without PR CI?)."
+            echo "No release found for $tag — skipping."
             exit 0
           fi
 
