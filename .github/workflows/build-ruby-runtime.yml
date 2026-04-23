@@ -16,9 +16,9 @@ name: Build Ruby Runtime
 # • Adding a new formula — it reuses the existing runtime release.
 #
 # ─── AFTER RUNNING ──────────────────────────────────────────────────────────
-# 1. Copy the sha256 printed in the Job Summary.
-# 2. Update RUBY_RUNTIME_VERSION + sha256 in every formula that uses it.
-# 3. Push → ci.yml detects the changed formulas → rebuilds and publishes bottles.
+# The workflow automatically opens a PR updating the sha256 in every formula
+# that references ruby-runtime.  Review and merge the PR — the push to main
+# triggers build-bottles, which rebuilds and publishes bottles.
 # ────────────────────────────────────────────────────────────────────────────
 on:
   workflow_dispatch:
@@ -35,6 +35,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      pull-requests: write
     env:
       RUBY_VERSION: ${{ inputs.ruby_version }}
 
@@ -99,6 +100,7 @@ jobs:
 
           SHA=$(shasum -a 256 "$TARBALL" | awk '{print $1}')
           echo "TARBALL=$TARBALL" >> "$GITHUB_ENV"
+          echo "SHA=$SHA" >> "$GITHUB_ENV"
 
           echo "### Ruby runtime ${RUBY_VERSION} (arm64)" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -124,3 +126,39 @@ jobs:
           fi
 
           gh release upload "$TAG" "$TARBALL" --clobber
+
+      - name: Open PR to update formula sha256
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH="update/ruby-runtime-${RUBY_VERSION}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git pull --rebase origin main
+
+          git checkout -B "$BRANCH"
+
+          ruby .github/scripts/update-runtime-sha.rb "$SHA" Formula/*.rb
+
+          git add Formula/
+          if git diff --cached --quiet; then
+            echo "sha256 already up to date — no PR needed."
+            exit 0
+          fi
+
+          git commit -m "fix: update ruby-runtime sha256 for ${RUBY_VERSION}"
+          git push --force origin "$BRANCH"
+
+          existing=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            echo "PR #${existing} already open — branch updated."
+          else
+            gh pr create \
+              --title "fix: update ruby-runtime sha256 for ${RUBY_VERSION}" \
+              --body "$(printf 'Automated update from [build-ruby-runtime run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).\n\n```\nsha256 \"%s\"\n```' "$SHA")" \
+              --base main \
+              --head "$BRANCH"
+          fi
