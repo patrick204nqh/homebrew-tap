@@ -18,7 +18,7 @@ class SumologicQuery < Formula
     url "https://github.com/patrick204nqh/homebrew-tap/releases/download/" \
         "ruby-runtime-#{RUBY_RUNTIME_VERSION}/" \
         "ruby-runtime-#{RUBY_RUNTIME_VERSION}-arm64-darwin.tar.gz"
-    sha256 "83ad276e1f9df812893dca46701c88b2713cd15698f3b353a9c355cdf25470fd"
+    sha256 "ebc275dd8ff4c90b5cfd0f1084df17241eeb8661267ee9b15532aa5f40fd05fa"
   end
 
   resource "thor" do
