@@ -155,6 +155,8 @@ jobs:
     name: Release
     needs: [detect, update-formulas]
     if: needs.detect.outputs.updates != '[]'
+    permissions:
+      contents: write
     uses: ./.github/workflows/release-bottles.yml
     with:
       formulas: ${{ needs.detect.outputs.formula_names }}

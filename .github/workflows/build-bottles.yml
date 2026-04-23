@@ -31,6 +31,8 @@ jobs:
     name: Release
     needs: [validate, prepare]
     if: github.actor != 'github-actions[bot]' && needs.validate.outputs.formulas != '[]'
+    permissions:
+      contents: write
     uses: ./.github/workflows/release-bottles.yml
     with:
       formulas: ${{ needs.validate.outputs.formulas }}
