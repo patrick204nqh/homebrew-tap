@@ -1,5 +1,5 @@
 name: Merge Bottle
-description: Merges brew bottle JSON, renames the tarball, commits, and pushes with retry.
+description: Merges brew bottle JSON, renames the tarball, commits, and opens a PR.
 
 inputs:
   formula_name:
@@ -10,14 +10,16 @@ inputs:
     description: Formula version string
   github_token:
     required: true
-    description: GitHub token for authenticated push
+    description: GitHub token for authenticated branch push and PR creation
 
 runs:
   using: composite
   steps:
-    - name: Merge, rename, commit and push
+    - name: Merge, rename, commit and open PR
       id: merge
       shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
       run: |
         set -euo pipefail
         git config user.name "github-actions[bot]"
@@ -41,14 +43,19 @@ runs:
 
         git add "Formula/${formula_name}.rb"
         if ! git diff --cached --quiet; then
+          branch="bottles/${formula_name}-v${version}"
+          git checkout -b "$branch"
           git commit -m "bottles: ${formula_name} v${version} [skip ci]"
-          pushed=false
-          for i in 1 2 3; do
-            if git pull --rebase origin main && git push origin HEAD:main; then
-              pushed=true
-              break
-            fi
-            sleep $((RANDOM % 10 + 5))
-          done
-          $pushed || { echo "ERROR: failed to push after 3 attempts"; exit 1; }
+          git push origin "$branch" --force
+
+          if gh pr view "$branch" --json number &>/dev/null 2>&1; then
+            echo "PR already open for ${branch} — skipping create."
+          else
+            gh pr create \
+              --title "bottles: ${formula_name} v${version}" \
+              --body "Automated bottle update for \`${formula_name}\` v${version} built by the CI pipeline." \
+              --base main \
+              --head "$branch" \
+              --label "bottles"
+          fi
         fi

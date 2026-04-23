@@ -2,8 +2,8 @@ name: Release Bottles
 
 # ─── PURPOSE ────────────────────────────────────────────────────────────────
 # Reusable workflow: given a list of formula names and a snapshot tag, builds
-# bottles, publishes them to a tap-YYYY-MM-DD GitHub Release, and smoke-tests
-# the install path a real user would take.
+# bottles, publishes them to a tap-YYYY-MM-DD GitHub Release, and opens a PR
+# per formula to merge the bottle block into the formula file.
 #
 # Called by build-bottles.yml (push to main) and sync-formulas.yml (weekly).
 # ────────────────────────────────────────────────────────────────────────────
@@ -57,6 +57,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write
+      pull-requests: write
     strategy:
       fail-fast: false
       matrix:
@@ -145,30 +146,3 @@ jobs:
             --draft=false \
             --prerelease=false
 
-  smoke-test:
-    name: Smoke Test / ${{ matrix.formula }}
-    needs: finalize
-    if: needs.finalize.result == 'success'
-    runs-on: macos-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        formula: ${{ fromJson(inputs.formulas) }}
-    steps:
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@675fcd27b59e54d310c5484c8c27c01d03da660c
-
-      - name: Install from bottle and test
-        env:
-          FORMULA: ${{ matrix.formula }}
-        run: |
-          set -euo pipefail
-          brew tap "$TAP"
-          brew install "$TAP/$FORMULA"
-          brew info --json "$TAP/$FORMULA" \
-            | jq -e '.[0].installed[0].poured_from_bottle == true' \
-            || { echo "ERROR: $FORMULA was not installed from a bottle"; exit 1; }
-          brew test "$TAP/$FORMULA"
