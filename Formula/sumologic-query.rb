@@ -117,7 +117,7 @@ class SumologicQuery < Formula
       content = f.read
       next unless content.match?(/\A#!.*ruby/)
 
-      f.write content.sub(/\A#!.*/, "#!#{bundled_ruby}")
+      f.atomic_write content.sub(/\A#!.*/, "#!#{bundled_ruby}")
     end
   end
 end
