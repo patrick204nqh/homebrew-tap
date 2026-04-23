@@ -12,11 +12,9 @@
 #
 # What it does
 # ────────────
-# 1. rbconfig.rb   — corrects the build-time prefix calculation so RbConfig
-#                    paths resolve relative to the installed location.
-# 2. Dylib load path — repairs the ruby binary's libruby reference if it is
+# 1. Dylib load path — repairs the ruby binary's libruby reference if it is
 #                    still an absolute path from the build environment.
-# 3. Script shebangs — replaces any ruby shebang with the exact installed path
+# 2. Script shebangs — replaces any ruby shebang with the exact installed path
 #                    so gem, irb, erb, … all invoke the bundled interpreter.
 
 require "pathname"
@@ -28,20 +26,7 @@ ruby_bin = prefix / "bin/ruby"
 
 abort "ERROR: #{ruby_bin} not found" unless ruby_bin.exist?
 
-# ── 1. rbconfig.rb prefix fix ─────────────────────────────────────────────────
-# Runtimes built before this fix embedded wrong relative-path arithmetic.
-# Replace the two-line _bin_dir + _prefix block with the correct __dir__ form.
-Pathname.glob("#{prefix}/lib/ruby/*/*/rbconfig.rb").each do |path|
-  src = path.read
-  next unless src.include?("runtime relocation patch")
-
-  patched = src.gsub(/( *)_bin_dir = [^\n]+\n\1_prefix\s+=\s+[^\n]+/) do
-    "#{Regexp.last_match(1)}_prefix = File.expand_path(\"../../../..\", __dir__)"
-  end
-  path.write(patched) unless patched == src
-end
-
-# ── 2. Dylib load path ────────────────────────────────────────────────────────
+# ── 1. Dylib load path ────────────────────────────────────────────────────────
 otool_out = IO.popen(["otool", "-L", ruby_bin.to_s], err: :close, &:read)
 old_dylib = otool_out.lines
                      .map { |l| l.strip.split.first }
@@ -53,7 +38,7 @@ if old_dylib && !old_dylib.start_with?("@")
          "@loader_path/../lib/#{lib_name}", ruby_bin.to_s
 end
 
-# ── 3. Script shebangs ────────────────────────────────────────────────────────
+# ── 2. Script shebangs ────────────────────────────────────────────────────────
 shebang = "#!#{ruby_bin}".b
 Pathname.glob("#{prefix}/bin/*").each do |f|
   next if f.symlink? || !f.file?
