@@ -36,4 +36,4 @@ jobs:
       formulas: ${{ needs.validate.outputs.formulas }}
       snapshot_tag: ${{ needs.prepare.outputs.snapshot_tag }}
     secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+      gh_token: ${{ secrets.GITHUB_TOKEN }}

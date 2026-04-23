@@ -160,4 +160,4 @@ jobs:
       formulas: ${{ needs.detect.outputs.formula_names }}
       snapshot_tag: ${{ needs.detect.outputs.snapshot_tag }}
     secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+      gh_token: ${{ secrets.GITHUB_TOKEN }}

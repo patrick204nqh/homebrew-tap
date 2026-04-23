@@ -19,7 +19,7 @@ on:
         type: string
         required: true
     secrets:
-      github_token:
+      gh_token:
         required: true
 
 env:
@@ -37,7 +37,7 @@ jobs:
 
       - name: Create draft release
         env:
-          GH_TOKEN: ${{ secrets.github_token }}
+          GH_TOKEN: ${{ secrets.gh_token }}
           SNAPSHOT_TAG: ${{ inputs.snapshot_tag }}
         run: |
           if gh release view "$SNAPSHOT_TAG" &>/dev/null; then
@@ -92,11 +92,11 @@ jobs:
         with:
           formula_name: ${{ matrix.formula }}
           version: ${{ env.VERSION }}
-          github_token: ${{ secrets.github_token }}
+          gh_token: ${{ secrets.gh_token }}
 
       - name: Upload bottle to snapshot release
         env:
-          GH_TOKEN: ${{ secrets.github_token }}
+          GH_TOKEN: ${{ secrets.gh_token }}
           SNAPSHOT_TAG: ${{ inputs.snapshot_tag }}
         run: |
           gh release upload "$SNAPSHOT_TAG" "$BOTTLE_FILE" --clobber
@@ -135,7 +135,7 @@ jobs:
 
       - name: Publish snapshot release
         env:
-          GH_TOKEN: ${{ secrets.github_token }}
+          GH_TOKEN: ${{ secrets.gh_token }}
           SNAPSHOT_TAG: ${{ inputs.snapshot_tag }}
           SNAPSHOT_NOTES: ${{ steps.versions.outputs.notes }}
           EVENT_NAME: ${{ github.event_name }}
