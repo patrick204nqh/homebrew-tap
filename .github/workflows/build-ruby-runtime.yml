@@ -121,7 +121,7 @@ jobs:
 
           if ! gh release view "$TAG" &>/dev/null; then
             gh release create "$TAG" \
-              --title "Ruby runtime ${RUBY_VERSION}" \
+              --title "$TAG" \
               --notes "Relocatable Ruby ${RUBY_VERSION} (arm64). Used by: ${consumers}."
           fi
 
