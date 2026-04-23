@@ -2,20 +2,23 @@
 
 ## CI strategy
 
-Four workflows handle all automation:
+Three workflows handle all automation. Every formula change goes through a
+PR — nothing is committed directly to `main` by bots.
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
-| [`sync-formulas.yml`](.github/workflows/sync-formulas.yml) | Weekly schedule (Sun 23:00 UTC) · manual dispatch | Detect new upstream versions · update formulas · build bottles · publish to a `tap-YYYY-MM-DD` snapshot release |
-| [`build-bottles.yml`](.github/workflows/build-bottles.yml) | Push to `main` (Formula/** only) · manual dispatch | Lint · audit · build bottle · publish to a `tap-YYYY-MM-DD` snapshot release |
-| [`validate-pr.yml`](.github/workflows/validate-pr.yml) | Pull request to `main` | RuboCop lint · `brew audit --strict` · `brew style` · install from source · `brew test` |
+| [`ci.yml`](.github/workflows/ci.yml) | Pull request to `main` | Lint · audit · install from source · build bottle · smoke-test from bottle |
+| [`release.yml`](.github/workflows/release.yml) | Push to `main` (Formula/** only) | Publish the prerelease bottle built during PR CI |
+| [`sync-formulas.yml`](.github/workflows/sync-formulas.yml) | Weekly schedule (Sun 23:00 UTC) · manual dispatch | Detect new upstream versions · open a PR with updated formulas |
 | [`build-ruby-runtime.yml`](.github/workflows/build-ruby-runtime.yml) | Manual dispatch only | Build a relocatable arm64 Ruby runtime · publish to `ruby-runtime-X.Y.Z` release · open PR to update sha256 in all formulas |
 
-**Automated path (`sync-formulas.yml`):** runs end-to-end without any PRs or human steps. It detects new upstream releases, updates the formula version and SHA256, builds the bottle, and publishes it to a `tap-YYYY-MM-DD` snapshot release. Bot commits carry `[skip ci]` so `build-bottles.yml` does not double-build.
+**PR flow:** `ci.yml` does everything needed to prove a formula is releasable —
+lint, audit, install from source, build the bottle, and smoke-test the install
+from that bottle. The bottle block (with its sha256) is committed back to the
+PR branch so the merged formula is complete. On merge, `release.yml` simply
+publishes the already-verified prerelease. No bottle is built post-merge.
 
-**Manual edit path (`build-bottles.yml`):** if you edit a formula by hand and push directly to `main`, `build-bottles.yml` picks up the changed formula file (via the `Formula/**` path filter), builds the bottle, and publishes it to a `tap-YYYY-MM-DD` snapshot release — the same scheme as the scheduled flow. Manual dispatch force-rebuilds all formulas.
-
-All bottles are stored as release assets under `tap-YYYY-MM-DD` tags. No bottles are committed to the repository — the `bottles/` directory is git-ignored.
+See [CI pipeline diagrams](docs/architecture/diagrams/ci-pipelines.md) for visual flowcharts.
 
 ## Adding a new formula
 
@@ -27,36 +30,47 @@ All bottles are stored as release assets under `tap-YYYY-MM-DD` tags. No bottles
    brew test patrick204nqh/tap/<tool-name>
    brew audit --strict patrick204nqh/tap/<tool-name>
    brew style Formula/<tool-name>.rb
-   ```
-
-3. Run the linter:
-
-   ```bash
    bundle exec rubocop Formula/<tool-name>.rb
    ```
 
-4. Open a PR — `validate-pr.yml` runs lint, audit, and install automatically.
-5. Merge the PR — `build-bottles.yml` builds the bottle, publishes it to the day's snapshot release, and commits the updated `bottle do` block back to the formula.
+3. Open a PR. `ci.yml` runs automatically:
+   - Lints and audits the formula
+   - Installs from source and runs `brew test`
+   - Builds a bottle and uploads it to a prerelease
+   - Commits the bottle block back to your PR branch
+   - Smoke-tests the install from that bottle
+4. Review the CI results and merge. `release.yml` publishes the bottle.
 
 ## Updating an existing formula
 
-Formulas are checked and updated automatically by [`sync-formulas.yml`](.github/workflows/sync-formulas.yml), which runs weekly (Sunday 23:00 UTC). To trigger an out-of-band update immediately:
+Formulas are checked and updated automatically by
+[`sync-formulas.yml`](.github/workflows/sync-formulas.yml), which runs weekly
+(Sunday 23:00 UTC). It opens a PR with the new version and sha256 — CI then
+builds and verifies bottles before you merge.
+
+To trigger an out-of-band update immediately:
 
 1. Go to **Actions → Sync Formulas → Run workflow**.
-
-The workflow updates every formula that has a new upstream release, builds bottles, and publishes them to a snapshot release — all in one run, no PR required.
+2. Review the opened PR and merge when CI passes.
 
 ## Updating the bundled Ruby runtime
 
-Formulas in this tap bundle a relocatable Ruby runtime instead of depending on Homebrew's `ruby` formula (which would pull in `llvm` and force source compilation). The runtime is built once and shared across all Ruby-based formulas.
+Formulas in this tap bundle a relocatable Ruby runtime instead of depending on
+Homebrew's `ruby` formula (which would pull in `llvm` and force source
+compilation). The runtime is built once and shared across all Ruby-based
+formulas.
 
 To upgrade the runtime version:
 
-1. Go to **Actions → Build Ruby Runtime → Run workflow** and enter the new version (e.g. `3.3.7`).
-2. The workflow builds the runtime, publishes it to a `ruby-runtime-X.Y.Z` release, and opens a PR updating the `sha256` in every formula that uses it.
-3. Review and merge the PR. The push triggers `build-bottles.yml`, which rebuilds and publishes bottles for the updated formulas.
+1. Go to **Actions → Build Ruby Runtime → Run workflow** and enter the new
+   version (e.g. `3.3.7`).
+2. The workflow builds the runtime, publishes it to a `ruby-runtime-X.Y.Z`
+   release, and opens a PR updating the `sha256` in every formula that uses it.
+3. Review and merge the PR. CI builds and verifies new bottles before merge;
+   `release.yml` publishes them on merge.
 
-See [ADR 001](docs/architecture/decisions/001-arm64-only-bottles.md) for the rationale behind arm64-only bottles.
+See [ADR 001](docs/architecture/decisions/001-arm64-only-bottles.md) for the
+rationale behind arm64-only bottles.
 
 ## Formula conventions
 
