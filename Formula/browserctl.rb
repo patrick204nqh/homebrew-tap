@@ -27,7 +27,7 @@ class Browserctl < Formula
     url "https://github.com/patrick204nqh/homebrew-tap/releases/download/" \
         "ruby-runtime-#{RUBY_RUNTIME_VERSION}/" \
         "ruby-runtime-#{RUBY_RUNTIME_VERSION}-arm64-darwin.tar.gz"
-    sha256 "f50b5e2ff624197745f91e3c8b5cf466f1e185e4fe8686e5ec8c90b7cd0776ff"
+    sha256 "650e57ea610b5e410051d9a9b2330c4b37ef62064a6c15170b0fb87f7b6d6b9c"
   end
 
   # nokogiri — precompiled arm64 platform gem (avoids needing libxml2/libxslt)
