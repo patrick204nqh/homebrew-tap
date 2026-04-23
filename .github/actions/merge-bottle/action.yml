@@ -1,5 +1,5 @@
 name: Merge Bottle
-description: Merges brew bottle JSON, renames the tarball, commits, and opens a PR.
+description: Merges brew bottle JSON into the formula and renames the tarball.
 
 inputs:
   formula_name:
@@ -8,24 +8,14 @@ inputs:
   version:
     required: true
     description: Formula version string
-  github_token:
-    required: true
-    description: GitHub token for authenticated branch push and PR creation
 
 runs:
   using: composite
   steps:
-    - name: Merge, rename, commit and open PR
-      id: merge
+    - name: Merge bottle block and rename tarball
       shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.github_token }}
       run: |
         set -euo pipefail
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git remote set-url origin "https://x-access-token:${{ inputs.github_token }}@github.com/${GITHUB_REPOSITORY}.git"
-        git pull --rebase origin main
         brew bottle --merge --write --no-commit *.bottle*.json
 
         formula_name="${{ inputs.formula_name }}"
@@ -40,22 +30,3 @@ runs:
         fi
         [ "$old_bottle" != "$new_bottle" ] && mv "$old_bottle" "$new_bottle"
         echo "BOTTLE_FILE=$new_bottle" >> "$GITHUB_ENV"
-
-        git add "Formula/${formula_name}.rb"
-        if ! git diff --cached --quiet; then
-          branch="bottles/${formula_name}-v${version}"
-          git checkout -b "$branch"
-          git commit -m "bottles: ${formula_name} v${version} [skip ci]"
-          git push origin "$branch" --force
-
-          if gh pr view "$branch" --json number &>/dev/null 2>&1; then
-            echo "PR already open for ${branch} — skipping create."
-          else
-            gh pr create \
-              --title "bottles: ${formula_name} v${version}" \
-              --body "Automated bottle update for \`${formula_name}\` v${version} built by the CI pipeline." \
-              --base main \
-              --head "$branch" \
-              --label "bottles"
-          fi
-        fi

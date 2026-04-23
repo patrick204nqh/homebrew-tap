@@ -15,14 +15,8 @@ jobs:
       contents: read
     outputs:
       updates: ${{ steps.check.outputs.updates }}
-      formula_names: ${{ steps.check.outputs.formula_names }}
-      snapshot_tag: ${{ steps.tag.outputs.snapshot_tag }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Compute snapshot tag
-        id: tag
-        run: echo "snapshot_tag=tap-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
       - name: Collect formula targets
         id: check
@@ -77,23 +71,22 @@ jobs:
           done
 
           updates=$(printf '%s\n' "${entries[@]+"${entries[@]}"}" | jq -sc .)
-          formula_names=$(echo "$updates" | jq -c '[.[].name]')
           {
             echo "updates<<EOF"
             echo "$updates"
             echo "EOF"
-            echo "formula_names=$formula_names"
           } >> "$GITHUB_OUTPUT"
           echo "Total queued: $(echo "$updates" | jq length)"
 
-  update-formulas:
-    name: Update Formulas
+  open-pr:
+    name: Open Update PR
     needs: detect
     if: needs.detect.outputs.updates != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -106,7 +99,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git pull --rebase origin main
+
+          branch="sync/formula-updates-$(date -u +%Y-%m-%d)"
+          git checkout -B "$branch"
 
           while IFS= read -r entry; do
             name=$(echo "$entry" | jq -r '.name')
@@ -114,7 +109,7 @@ jobs:
             latest=$(echo "$entry" | jq -r '.latest')
 
             if [ "$current" = "$latest" ]; then
-              echo "$name: already at $latest, skipping version update."
+              echo "$name: already at $latest, skipping."
               continue
             fi
 
@@ -137,21 +132,26 @@ jobs:
           done < <(echo "$UPDATES" | jq -c '.[]')
 
           git add Formula/
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: sync formula versions [skip ci]"
-            git push origin HEAD:main
-          else
-            echo "No formula version changes to commit."
+          if git diff --cached --quiet; then
+            echo "No formula changes to commit."
+            exit 0
           fi
 
-  release:
-    name: Release
-    needs: [detect, update-formulas]
-    if: needs.detect.outputs.updates != '[]'
-    permissions:
-      contents: write
-    uses: ./.github/workflows/release-bottles.yml
-    with:
-      formulas: ${{ needs.detect.outputs.formula_names }}
-      snapshot_tag: ${{ needs.detect.outputs.snapshot_tag }}
-    secrets: inherit
+          summary=$(echo "$UPDATES" | jq -r \
+            '.[] | select(.current != .latest) | "- `\(.name)`: \(.current) → \(.latest)"' \
+            | tr '\n' '\n')
+
+          git commit -m "chore: sync formula versions"
+          git push --force origin "$branch"
+
+          existing=$(gh pr list --head "$branch" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "PR #${existing} already open for ${branch} — branch updated."
+          else
+            gh pr create \
+              --title "chore: sync formula versions $(date -u +%Y-%m-%d)" \
+              --body "$(printf 'Automated weekly formula version sync.\n\n## Updates\n\n%s\n\nCI will build and verify bottles before this PR can be merged.' "$summary")" \
+              --base main \
+              --head "$branch" \
+              --label "dependencies"
+          fi

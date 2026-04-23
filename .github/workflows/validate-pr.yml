@@ -24,15 +24,125 @@ jobs:
     permissions:
       contents: read
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         formula: ${{ fromJson(needs.validate.outputs.formulas) }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-tap
-      - name: Install and test
+      - name: Install from source and test
         env:
           FORMULA: ${{ matrix.formula }}
         run: |
           brew install --build-from-source "$TAP/$FORMULA"
+          brew test "$TAP/$FORMULA"
+
+  bottle:
+    name: Bottle / ${{ matrix.formula }}
+    needs: [validate, install]
+    if: needs.validate.outputs.formulas != '[]'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        formula: ${{ fromJson(needs.validate.outputs.formulas) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: ./.github/actions/setup-tap
+
+      - name: Compute release metadata
+        id: meta
+        env:
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          version=$(brew info --json "$TAP/$FORMULA" | jq -r '.[0].versions.stable')
+          tag="${FORMULA}-v${version}"
+          root_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}"
+          echo "version=$version"   >> "$GITHUB_OUTPUT"
+          echo "tag=$tag"           >> "$GITHUB_OUTPUT"
+          echo "root_url=$root_url" >> "$GITHUB_OUTPUT"
+
+      - name: Create prerelease (if absent)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          FORMULA: ${{ matrix.formula }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          if ! gh release view "$TAG" &>/dev/null; then
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --prerelease \
+              --notes "Pre-release bottle for \`$FORMULA\` v$VERSION — pending PR merge."
+          fi
+
+      - name: Build bottle
+        env:
+          FORMULA: ${{ matrix.formula }}
+          ROOT_URL: ${{ steps.meta.outputs.root_url }}
+        run: |
+          brew install --build-bottle "$TAP/$FORMULA"
+          brew bottle --json --root-url "$ROOT_URL" "$TAP/$FORMULA"
+
+      - name: Merge bottle block and rename tarball
+        uses: ./.github/actions/merge-bottle
+        with:
+          formula_name: ${{ matrix.formula }}
+          version: ${{ steps.meta.outputs.version }}
+
+      - name: Upload bottle to prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: gh release upload "$TAG" "$BOTTLE_FILE" --clobber
+
+      - name: Commit bottle block to PR branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORMULA: ${{ matrix.formula }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git add "Formula/${FORMULA}.rb"
+          if ! git diff --cached --quiet; then
+            git commit -m "bottles: ${FORMULA} v${VERSION} [skip ci]"
+            git push origin "HEAD:${{ github.head_ref }}"
+          fi
+
+  smoke-test:
+    name: Smoke Test / ${{ matrix.formula }}
+    needs: [validate, bottle]
+    if: needs.validate.outputs.formulas != '[]'
+    runs-on: macos-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        formula: ${{ fromJson(needs.validate.outputs.formulas) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: ./.github/actions/setup-tap
+
+      - name: Install from bottle and verify
+        env:
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          brew install "$TAP/$FORMULA"
+          brew info --json "$TAP/$FORMULA" \
+            | jq -e '.[0].installed[0].poured_from_bottle == true' \
+            || { echo "ERROR: $FORMULA was not poured from a bottle"; exit 1; }
           brew test "$TAP/$FORMULA"

@@ -1,0 +1,73 @@
+name: Release
+
+# ─── PURPOSE ────────────────────────────────────────────────────────────────
+# Triggered when a PR merges into main and touches Formula/*.
+# Publishes the prerelease bottle that was built and verified during PR CI.
+# No bottle is built here — the heavy work is already done.
+# ────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [main]
+    paths: ['Formula/**']
+
+env:
+  TAP: patrick204nqh/tap
+
+jobs:
+  detect:
+    name: Detect Changed Formulas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      formulas: ${{ steps.detect.outputs.formulas }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: ./.github/actions/detect-formulas
+        id: detect
+        with:
+          mode: push
+
+  publish:
+    name: Publish / ${{ matrix.formula }}
+    needs: detect
+    if: needs.detect.outputs.formulas != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        formula: ${{ fromJson(needs.detect.outputs.formulas) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          set -euo pipefail
+          version=$(grep -oP '(?:archive/refs/tags/v|releases/download/v)\K[0-9]+\.[0-9]+\.[0-9]+' \
+            "Formula/${FORMULA}.rb" | head -1)
+          if [ -z "$version" ]; then
+            version=$(grep -oP '^\s+version\s+"\K[^"]+' "Formula/${FORMULA}.rb" | head -1)
+          fi
+          tag="${FORMULA}-v${version}"
+
+          if ! gh release view "$tag" &>/dev/null; then
+            echo "No release found for $tag — skipping (direct push without PR CI?)."
+            exit 0
+          fi
+
+          is_prerelease=$(gh release view "$tag" --json isPrerelease -q '.isPrerelease')
+          if [ "$is_prerelease" = "true" ]; then
+            gh release edit "$tag" --prerelease=false
+            echo "Published $tag"
+          else
+            echo "$tag is already published — nothing to do."
+          fi
