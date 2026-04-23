@@ -259,3 +259,27 @@ jobs:
             --draft=false \
             --prerelease=false \
             --latest
+
+  smoke-test:
+    name: Smoke Test / ${{ matrix.formula.name }}
+    needs: [detect, tag-snapshot]
+    if: needs.tag-snapshot.result == 'success'
+    runs-on: macos-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        formula: ${{ fromJson(needs.detect.outputs.updates) }}
+    steps:
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@675fcd27b59e54d310c5484c8c27c01d03da660c
+
+      - name: Install from bottle and test
+        env:
+          FORMULA: ${{ matrix.formula.name }}
+        run: |
+          brew tap patrick204nqh/tap
+          brew install "patrick204nqh/tap/$FORMULA"
+          brew test "patrick204nqh/tap/$FORMULA"

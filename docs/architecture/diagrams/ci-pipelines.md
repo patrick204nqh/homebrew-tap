@@ -10,6 +10,7 @@ flowchart TD
     PREPARE[prepare\ncreate draft tap-YYYY-MM-DD release]
     BUILD[build-and-publish\nmatrix per formula]
     FINALIZE[finalize\npublish snapshot release]
+    SMOKE[smoke-test\nbrew tap · brew install · brew test]
     SKIP([skip])
 
     T --> VALIDATE
@@ -17,11 +18,13 @@ flowchart TD
     VALIDATE -->|nothing changed| SKIP
     PREPARE --> BUILD
     BUILD --> FINALIZE
+    FINALIZE --> SMOKE
 
     style VALIDATE fill:#dbeafe,stroke:#93c5fd
     style PREPARE  fill:#dbeafe,stroke:#93c5fd
     style BUILD    fill:#dcfce7,stroke:#86efac
     style FINALIZE fill:#dbeafe,stroke:#93c5fd
+    style SMOKE    fill:#fef9c3,stroke:#fde047
     style SKIP     fill:#f3f4f6,stroke:#d1d5db
 ```
 
@@ -53,7 +56,8 @@ flowchart TD
     DETECT[detect\ncheck upstream versions]
     CREATE[create-release\ndraft]
     BUILD[update-and-build\nmatrix per formula]
-    TAG[tag-snapshot\npublish]
+    TAG[tag-snapshot\npublish snapshot release]
+    SMOKE[smoke-test\nbrew tap · brew install · brew test]
     SKIP([skip])
 
     T --> DETECT
@@ -61,11 +65,13 @@ flowchart TD
     DETECT -->|nothing to update| SKIP
     CREATE --> BUILD
     BUILD --> TAG
+    TAG --> SMOKE
 
     style DETECT fill:#dbeafe,stroke:#93c5fd
     style CREATE fill:#dbeafe,stroke:#93c5fd
     style BUILD  fill:#dcfce7,stroke:#86efac
     style TAG    fill:#dbeafe,stroke:#93c5fd
+    style SMOKE  fill:#fef9c3,stroke:#fde047
     style SKIP   fill:#f3f4f6,stroke:#d1d5db
 ```
 
