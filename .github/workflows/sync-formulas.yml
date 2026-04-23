@@ -153,5 +153,5 @@ jobs:
               --body "$(printf 'Automated weekly formula version sync.\n\n## Updates\n\n%s\n\nCI will build and verify bottles before this PR can be merged.' "$summary")" \
               --base main \
               --head "$branch" \
-              --label "dependencies"
+              --label "formula-update"
           fi
