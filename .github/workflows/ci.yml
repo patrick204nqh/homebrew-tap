@@ -57,12 +57,16 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      - name: Sync workspace to latest PR branch state
+      - uses: ./.github/actions/setup-tap
+
+      # setup-tap runs `brew update` which fetches from the tap's git remote.
+      # Since the tap is symlinked to this workspace, that fetch can reset
+      # our working tree to main's state (with the old bottle URLs).
+      # Force the workspace back to the PR branch tip here.
+      - name: Sync workspace to PR branch (after brew update)
         run: |
           git fetch origin "${{ github.head_ref }}"
           git reset --hard "origin/${{ github.head_ref }}"
-
-      - uses: ./.github/actions/setup-tap
 
       - name: Compute release metadata
         id: meta
@@ -142,12 +146,14 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      - name: Sync workspace to latest PR branch state
+      - uses: ./.github/actions/setup-tap
+
+      # setup-tap runs `brew update` which can reset the workspace to main's
+      # state. Force it back to the PR branch tip before installing.
+      - name: Sync workspace to PR branch (after brew update)
         run: |
           git fetch origin "${{ github.head_ref }}"
           git reset --hard "origin/${{ github.head_ref }}"
-
-      - uses: ./.github/actions/setup-tap
 
       - name: Install from bottle and verify
         env:
@@ -184,7 +190,7 @@ jobs:
         run: |
           set -euo pipefail
           # Derive the snapshot tag from the bottle block root_url written by CI.
-          # All formulas in the PR share the same tap-YYYY-MM-DD tag, so we only
+          # All formulas in the PR share the same tap-pr-{N} tag, so we only
           # need to find it once.
           tag=""
           while IFS= read -r formula; do
