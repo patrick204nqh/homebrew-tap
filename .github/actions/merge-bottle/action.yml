@@ -19,12 +19,12 @@ runs:
       id: merge
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ inputs.github_token }}
+        GIT_TOKEN: ${{ inputs.github_token }}
       run: |
         set -euo pipefail
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        git remote set-url origin "https://x-access-token:${GIT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         git pull --rebase origin main
         brew bottle --merge --write --no-commit *.bottle*.json
 
