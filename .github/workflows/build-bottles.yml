@@ -37,5 +37,4 @@ jobs:
     with:
       formulas: ${{ needs.validate.outputs.formulas }}
       snapshot_tag: ${{ needs.prepare.outputs.snapshot_tag }}
-    secrets:
-      gh_token: ${{ secrets.GITHUB_TOKEN }}
+    secrets: inherit

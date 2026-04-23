@@ -18,10 +18,6 @@ on:
         description: 'Snapshot release tag, e.g. tap-2026-04-23'
         type: string
         required: true
-    secrets:
-      gh_token:
-        required: true
-
 env:
   TAP: patrick204nqh/tap
 
@@ -37,7 +33,7 @@ jobs:
 
       - name: Create draft release
         env:
-          GH_TOKEN: ${{ secrets.gh_token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SNAPSHOT_TAG: ${{ inputs.snapshot_tag }}
         run: |
           if gh release view "$SNAPSHOT_TAG" &>/dev/null; then
@@ -92,11 +88,11 @@ jobs:
         with:
           formula_name: ${{ matrix.formula }}
           version: ${{ env.VERSION }}
-          gh_token: ${{ secrets.gh_token }}
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload bottle to snapshot release
         env:
-          GH_TOKEN: ${{ secrets.gh_token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SNAPSHOT_TAG: ${{ inputs.snapshot_tag }}
         run: |
           gh release upload "$SNAPSHOT_TAG" "$BOTTLE_FILE" --clobber
@@ -135,7 +131,7 @@ jobs:
 
       - name: Publish snapshot release
         env:
-          GH_TOKEN: ${{ secrets.gh_token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SNAPSHOT_TAG: ${{ inputs.snapshot_tag }}
           SNAPSHOT_NOTES: ${{ steps.versions.outputs.notes }}
           EVENT_NAME: ${{ github.event_name }}

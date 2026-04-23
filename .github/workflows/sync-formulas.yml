@@ -161,5 +161,4 @@ jobs:
     with:
       formulas: ${{ needs.detect.outputs.formula_names }}
       snapshot_tag: ${{ needs.detect.outputs.snapshot_tag }}
-    secrets:
-      gh_token: ${{ secrets.GITHUB_TOKEN }}
+    secrets: inherit
