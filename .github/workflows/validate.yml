@@ -1,29 +1,25 @@
-name: Validate Formulas
+name: Validate
 
+# Human-authored checks: lint the Ruby sources, detect which formulas
+# changed, audit them. Never writes anything to the repo.
 on:
-  workflow_call:
-    inputs:
-      mode:
-        description: '"push" compares HEAD~1..HEAD; "pr" compares base_ref...HEAD'
-        type: string
-        required: true
-      base_ref:
-        description: PR base branch — only used when mode=pr
-        type: string
-        required: false
-        default: ""
-    outputs:
-      formulas:
-        description: JSON array of changed formula names
-        value: ${{ jobs.detect.outputs.formulas }}
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 env:
   TAP: patrick204nqh/tap
   RUBY_VERSION: "3.4"
 
+concurrency:
+  group: validate-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   lint:
-    name: Lint
+    # Check name kept as "Validate / Lint" so the ruleset's required_status_checks
+    # entry matches without a ruleset update. Same applies to Audit below.
+    name: Validate / Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -37,7 +33,7 @@ jobs:
       - run: bundle exec rubocop
 
   detect:
-    name: Detect Formulas
+    name: Validate / Detect Formulas
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -51,11 +47,11 @@ jobs:
       - uses: ./.github/actions/detect-formulas
         id: detect
         with:
-          mode: ${{ inputs.mode }}
-          base_ref: ${{ inputs.base_ref }}
+          mode: pr
+          base_ref: ${{ github.base_ref }}
 
   audit:
-    name: Audit
+    name: Validate / Audit
     needs: detect
     if: needs.detect.outputs.formulas != '[]'
     runs-on: ubuntu-latest
