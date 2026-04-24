@@ -37,12 +37,9 @@ See [CI pipeline diagrams](docs/architecture/diagrams/ci-pipelines.md) for visua
    bundle exec rubocop Formula/<tool-name>.rb
    ```
 
-3. Open a PR. `ci.yml` runs automatically:
-   - Lints and audits the formula
-   - Installs from source and runs `brew test`
-   - Builds a bottle and uploads it to a prerelease
-   - Commits the bottle block back to your PR branch
-   - Smoke-tests the install from that bottle
+3. Open a PR. `validate.yml` and `bottle.yml` run automatically in parallel:
+   - `validate.yml` — lints and audits the formula (human-authored checks)
+   - `bottle.yml` — builds the bottle (installs from source + `brew test` as part of bottling), uploads it to a prerelease, commits the bottle block back to your PR branch, and smoke-tests the install from that bottle
 4. Review the CI results and merge. `release.yml` publishes the bottle.
 
 ## Updating an existing formula
