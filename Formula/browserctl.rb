@@ -8,9 +8,9 @@ class Browserctl < Formula
   license "MIT"
 
   bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-24"
-    rebuild 5
-    sha256 cellar: :any, arm64_sequoia: "30a97dac32190aba3ab3a03acdbc3860e024b98d223c592ef5b64acee37dbcea"
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-28"
+    rebuild 6
+    sha256 cellar: :any, arm64_sequoia: "a7a81995b82974d94236667fe7e5cc4e1f2da1500518aa5ceca95e2827605cec"
   end
 
   depends_on "gmp"
@@ -161,7 +161,13 @@ class Browserctl < Formula
   end
 
   test do
+    # Both CLIs must be exercised through their write_env_script wrappers.
+    # browserctl --help is a lighter path; browserd --version forces the
+    # bundled ruby-runtime + gem activation chain (ferrum, websocket-driver,
+    # nokogiri native ext). A broken runtime or wrapper PATH would pass
+    # --help but fail --version, so test both.
     assert_match "Usage: browserctl", shell_output("#{bin}/browserctl --help 2>&1")
+    assert_match(/browserd \d+\.\d+\.\d+/, shell_output("#{bin}/browserd --version 2>&1"))
   end
 
   private
