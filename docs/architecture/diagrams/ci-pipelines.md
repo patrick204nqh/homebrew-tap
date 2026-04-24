@@ -1,31 +1,29 @@
 # CI Pipeline Diagrams
 
-## 1. CI — Pull Request (`ci.yml`)
+## 1. Pull Request — `validate.yml` + `bottle.yml`
 
-Every PR to `main` runs the full pipeline. Bottles are built and verified
-before merge; no build work happens after.
+PR checks are split by concern: `validate.yml` runs the human-authored
+checks, `bottle.yml` runs the bot-authored build + smoke test. They run
+in parallel; both must pass before merge.
 
 ```mermaid
 flowchart TD
     T([pull_request → main\nopened · synchronize · reopened])
 
-    VALIDATE[Validate\nlint · detect · audit\nreusable workflow]
-    BOTTLE[Bottle / formula\nbrew install --build-bottle · brew test\nbrew bottle · upload to prerelease\ncommit bottle block to PR branch]
-    SMOKE[Smoke Test / formula\nbrew install from prerelease bottle\npoured_from_bottle · brew test]
-    SKIP([skip — no formula changes])
+    VALIDATE[validate.yml\nLint · Detect · Audit\nhuman-authored checks]
+    BOTTLE[bottle.yml\nBuild / formula — build · upload · commit bottle block\nSmoke Test / formula — install from bottle · brew test]
+    BOTTLE_SKIP([bottle.yml skipped — no Formula/** changes])
 
     T --> VALIDATE
-    VALIDATE -->|formulas changed| BOTTLE
-    VALIDATE -->|nothing changed| SKIP
-    BOTTLE --> SMOKE
+    T -->|Formula/** changed| BOTTLE
+    T -->|no Formula/** changes| BOTTLE_SKIP
 
-    style VALIDATE fill:#dbeafe,stroke:#93c5fd
-    style BOTTLE   fill:#dcfce7,stroke:#86efac
-    style SMOKE    fill:#fef9c3,stroke:#fde047
-    style SKIP     fill:#f3f4f6,stroke:#d1d5db
+    style VALIDATE   fill:#dbeafe,stroke:#93c5fd
+    style BOTTLE     fill:#dcfce7,stroke:#86efac
+    style BOTTLE_SKIP fill:#f3f4f6,stroke:#d1d5db
 ```
 
-When a PR is **closed without merging**, a `cleanup` job fires and deletes
+When a PR is **closed without merging**, `cleanup.yml` fires and deletes
 any prerelease that was created during CI.
 
 ---
