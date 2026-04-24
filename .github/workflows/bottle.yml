@@ -1,32 +1,46 @@
-name: CI
+name: Bottle
 
+# Bot-authored steps: build the bottle, upload it to a prerelease, commit
+# the bottle block back to the PR branch, and smoke-test installation from
+# the uploaded bottle. Runs only when a Formula/* file changes.
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
+    paths: ['Formula/**']
 
 env:
   TAP: patrick204nqh/tap
 
-# Bot commits back to the PR branch retrigger CI. Cancel the tail of the
-# previous run on the same PR so old and new bottle jobs don't race.
+# Bot commits back to the PR branch retrigger this workflow. Cancel the tail
+# of the previous run so old and new build jobs don't race.
 concurrency:
-  group: ci-pr-${{ github.event.pull_request.number }}
+  group: bottle-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Validate
-    if: github.event.action != 'closed'
-    uses: ./.github/workflows/validate-formulas.yml
-    with:
-      mode: pr
-      base_ref: ${{ github.base_ref }}
+  detect:
+    name: Detect Formulas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      formulas: ${{ steps.detect.outputs.formulas }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/detect-formulas
+        id: detect
+        with:
+          mode: pr
+          base_ref: ${{ github.base_ref }}
 
-  bottle:
-    name: Bottle / ${{ matrix.formula }}
-    needs: validate
-    if: needs.validate.result == 'success' && needs.validate.outputs.formulas != '[]'
+  build:
+    name: Build / ${{ matrix.formula }}
+    needs: detect
+    if: needs.detect.outputs.formulas != '[]'
     runs-on: macos-latest
     timeout-minutes: 60
     permissions:
@@ -35,7 +49,7 @@ jobs:
       fail-fast: true
       max-parallel: 1
       matrix:
-        formula: ${{ fromJson(needs.validate.outputs.formulas) }}
+        formula: ${{ fromJson(needs.detect.outputs.formulas) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,7 +58,7 @@ jobs:
       # The bottle-commit step pushes back to the PR branch with an app token,
       # which retriggers this workflow. On the second run the bottle block is
       # already current, so short-circuit here before paying for setup-tap
-      # (~2-3 min Homebrew install) or metadata.
+      # (~12s Homebrew install) or metadata.
       - name: Check if bottle already current
         id: check
         env:
@@ -122,9 +136,9 @@ jobs:
           TAG: ${{ steps.meta.outputs.tag }}
         run: gh release upload "$TAG" "$BOTTLE_FILE" --clobber
 
-      # App token push retriggers CI on the new SHA so required checks land on
-      # the bot commit. GITHUB_TOKEN pushes don't trigger workflows, which is
-      # why we can't just use it here.
+      # App token push retriggers this workflow on the new SHA so required
+      # checks land on the bot commit. GITHUB_TOKEN pushes don't trigger
+      # workflows, which is why we can't just use it here.
       - name: Generate app token
         if: steps.check.outputs.skip != 'true'
         id: app-token
@@ -151,10 +165,10 @@ jobs:
             git push origin "HEAD:${{ github.head_ref }}"
           fi
 
-  smoke-test:
+  smoke:
     name: Smoke Test / ${{ matrix.formula }}
-    needs: [validate, bottle]
-    if: needs.validate.result == 'success' && needs.validate.outputs.formulas != '[]'
+    needs: [detect, build]
+    if: needs.detect.outputs.formulas != '[]'
     runs-on: macos-latest
     timeout-minutes: 20
     permissions:
@@ -162,7 +176,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        formula: ${{ fromJson(needs.validate.outputs.formulas) }}
+        formula: ${{ fromJson(needs.detect.outputs.formulas) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -186,55 +200,3 @@ jobs:
             | jq -e '.[0].installed[0].poured_from_bottle == true' \
             || { echo "ERROR: $FORMULA was not poured from a bottle"; exit 1; }
           brew test "$TAP/$FORMULA"
-
-  cleanup:
-    name: Cleanup Prereleases
-    if: github.event.action == 'closed' && !github.event.pull_request.merged
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: ./.github/actions/detect-formulas
-        id: detect
-        with:
-          mode: pr
-          base_ref: ${{ github.base_ref }}
-
-      - name: Delete prerelease for abandoned PR
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FORMULAS: ${{ steps.detect.outputs.formulas }}
-        run: |
-          set -euo pipefail
-          # Derive the snapshot tag from the bottle block root_url written by CI.
-          # All formulas in the PR share the same tap-pr-{N} tag, so we only
-          # need to find it once.
-          tag=""
-          while IFS= read -r formula; do
-            tag=$(grep -oP 'root_url.*releases/download/\K[^"]+' \
-              "Formula/${formula}.rb" 2>/dev/null | head -1 || true)
-            [ -n "$tag" ] && break
-          done < <(echo "$FORMULAS" | jq -r '.[]')
-
-          if [ -z "$tag" ]; then
-            echo "No bottle block found in changed formulas — nothing to clean up."
-            exit 0
-          fi
-
-          if ! gh release view "$tag" &>/dev/null; then
-            echo "$tag: no release found, skipping."
-            exit 0
-          fi
-
-          is_prerelease=$(gh release view "$tag" --json isPrerelease -q '.isPrerelease')
-          if [ "$is_prerelease" = "true" ]; then
-            gh release delete "$tag" --yes --cleanup-tag
-            echo "Deleted prerelease $tag"
-          else
-            echo "$tag is already published — keeping."
-          fi

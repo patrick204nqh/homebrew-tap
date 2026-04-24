@@ -1,0 +1,62 @@
+name: Cleanup
+
+# On PR close without merge, delete the prerelease snapshot that was
+# built during CI. Scoped to its own workflow so open PRs aren't cluttered
+# by an "always skipped" cleanup check.
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+jobs:
+  cleanup:
+    name: Delete Prerelease
+    if: ${{ !github.event.pull_request.merged }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/detect-formulas
+        id: detect
+        with:
+          mode: pr
+          base_ref: ${{ github.base_ref }}
+
+      - name: Delete prerelease for abandoned PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORMULAS: ${{ steps.detect.outputs.formulas }}
+        run: |
+          set -euo pipefail
+          # Derive the snapshot tag from the bottle block root_url written by CI.
+          # All formulas in the PR share the same tap-pr-{N} tag, so we only
+          # need to find it once.
+          tag=""
+          while IFS= read -r formula; do
+            tag=$(grep -oP 'root_url.*releases/download/\K[^"]+' \
+              "Formula/${formula}.rb" 2>/dev/null | head -1 || true)
+            [ -n "$tag" ] && break
+          done < <(echo "$FORMULAS" | jq -r '.[]')
+
+          if [ -z "$tag" ]; then
+            echo "No bottle block found in changed formulas — nothing to clean up."
+            exit 0
+          fi
+
+          if ! gh release view "$tag" &>/dev/null; then
+            echo "$tag: no release found, skipping."
+            exit 0
+          fi
+
+          is_prerelease=$(gh release view "$tag" --json isPrerelease -q '.isPrerelease')
+          if [ "$is_prerelease" = "true" ]; then
+            gh release delete "$tag" --yes --cleanup-tag
+            echo "Deleted prerelease $tag"
+          else
+            echo "$tag is already published — keeping."
+          fi
