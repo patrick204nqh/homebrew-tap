@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   detect:
-    name: Bottle / Detect Formulas
+    name: Detect Formulas
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -38,7 +38,7 @@ jobs:
           base_ref: ${{ github.base_ref }}
 
   build:
-    name: Bottle / Build / ${{ matrix.formula }}
+    name: Build / ${{ matrix.formula }}
     needs: detect
     if: needs.detect.outputs.formulas != '[]'
     runs-on: macos-latest
@@ -166,7 +166,7 @@ jobs:
           fi
 
   smoke:
-    name: Bottle / Smoke Test / ${{ matrix.formula }}
+    name: Smoke Test / ${{ matrix.formula }}
     needs: [detect, build]
     if: needs.detect.outputs.formulas != '[]'
     runs-on: macos-latest

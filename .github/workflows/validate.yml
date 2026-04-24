@@ -17,9 +17,7 @@ concurrency:
 
 jobs:
   lint:
-    # Check name kept as "Validate / Lint" so the ruleset's required_status_checks
-    # entry matches without a ruleset update. Same applies to Audit below.
-    name: Validate / Lint
+    name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -33,7 +31,7 @@ jobs:
       - run: bundle exec rubocop
 
   detect:
-    name: Validate / Detect Formulas
+    name: Detect Formulas
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -51,7 +49,7 @@ jobs:
           base_ref: ${{ github.base_ref }}
 
   audit:
-    name: Validate / Audit
+    name: Audit
     needs: detect
     if: needs.detect.outputs.formulas != '[]'
     runs-on: ubuntu-latest

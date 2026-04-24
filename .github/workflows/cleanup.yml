@@ -10,7 +10,7 @@ on:
 
 jobs:
   cleanup:
-    name: Cleanup / Delete Prerelease
+    name: Delete Prerelease
     if: ${{ !github.event.pull_request.merged }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
