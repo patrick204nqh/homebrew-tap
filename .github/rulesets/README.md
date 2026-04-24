@@ -6,7 +6,7 @@ These JSON files define GitHub repository rulesets managed as code.
 
 | File | Target | Purpose |
 |------|--------|---------|
-| `main-branch.json` | `main` branch | Require PR + CI before merge; block force pushes and deletion |
+| `main-branch.json` | `main` branch | Require PR review before merge; block force pushes and deletion |
 | `release-tags.json` | `v*` tags | Prevent deletion or modification of release tags |
 
 ## How to apply
@@ -25,8 +25,7 @@ gh api repos/{owner}/{repo}/rulesets --method POST --input .github/rulesets/rele
 
 ## Notes
 
-- Required status checks are `Lint` and `Audit` from `validate.yml`. Dynamic matrix jobs from `bottle.yml` (`Build / <formula>`, `Smoke Test / <formula>`) are intentionally excluded since their names depend on which formulas changed.
-- Check names in the JSON are the CheckRun `name` field (short form). GitHub's PR UI renders them as `<workflow name> / <check name>` (e.g. `Validate / Lint`), but the ruleset matches on the short form.
-- Repository admins (role ID 5) can bypass the branch ruleset for emergency merges.
+- **No required_status_checks rule.** For a solo-maintained tap where the owner (admin) bypassed every check anyway, required checks were theater — they forced validate/bottle workflows to land status on every PR even when irrelevant (e.g. markdown-only changes triggering a full Lint/Audit run just to satisfy the gate). CI still runs visibly on code PRs; it's just not a merge blocker. If the repo ever gets outside collaborators, add `required_status_checks` back.
+- Repository admins (role ID 5) can bypass the `pull_request` review rule for emergency merges.
 - The tag ruleset has no bypass — release tags are immutable once pushed.
-- To update an applied ruleset, find its ID with `gh api repos/{owner}/{repo}/rulesets` then `PATCH` to `.../rulesets/{id}` with the JSON file as input.
+- To update an applied ruleset, find its ID with `gh api repos/{owner}/{repo}/rulesets` then `PUT` to `.../rulesets/{id}` with the JSON file as input.

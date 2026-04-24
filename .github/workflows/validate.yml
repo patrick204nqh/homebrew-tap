@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
+    # Skip for docs-only changes — rubocop has nothing to lint and
+    # the formula audit short-circuits anyway.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/rulesets/**'
 
 env:
   TAP: patrick204nqh/tap
