@@ -66,7 +66,7 @@ flowchart TD
     DETECT -->|updates found| OPEN_PR
     DETECT -->|nothing to update| SKIP
 
-    OPEN_PR -.->|CI runs automatically| CI[ci.yml\nbuild + verify bottles]
+    OPEN_PR -.->|CI runs automatically| CI[validate.yml + bottle.yml\nlint · audit · build + verify bottles]
     CI -.->|PR merged| RELEASE[release.yml\npublish bottles]
 
     style DETECT   fill:#dbeafe,stroke:#93c5fd
@@ -93,7 +93,7 @@ flowchart TD
 
     T --> VALIDATE --> BUILD --> PATCH --> ARCHIVE --> UPLOAD --> PR
 
-    PR -.->|CI runs automatically| CI[ci.yml\nbuild + verify bottles]
+    PR -.->|CI runs automatically| CI[validate.yml + bottle.yml\nlint · audit · build + verify bottles]
     CI -.->|PR merged| RELEASE[release.yml\npublish bottles]
 
     style VALIDATE fill:#dbeafe,stroke:#93c5fd
