@@ -7,8 +7,14 @@ runs:
     - name: Set up Homebrew
       uses: Homebrew/actions/setup-homebrew@675fcd27b59e54d310c5484c8c27c01d03da660c
 
-    - name: Link tap
+    - name: Link tap and pin workspace
       shell: bash
       run: |
         mkdir -p "$(brew --repository)/Library/Taps/patrick204nqh"
         ln -sfn "$GITHUB_WORKSPACE" "$(brew --repository)/Library/Taps/patrick204nqh/homebrew-tap"
+        # Prevent brew auto-update on subsequent commands. Without this,
+        # brew commands run `git fetch` + `git reset` on all installed taps —
+        # and since our tap is symlinked to the workspace, that clobbered the
+        # PR branch state back to main. Pinning keeps the workspace on the
+        # checked-out ref.
+        echo "HOMEBREW_NO_AUTO_UPDATE=1" >> "$GITHUB_ENV"
