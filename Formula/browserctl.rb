@@ -161,7 +161,13 @@ class Browserctl < Formula
   end
 
   test do
+    # Both CLIs must be exercised through their write_env_script wrappers.
+    # browserctl --help is a lighter path; browserd --version forces the
+    # bundled ruby-runtime + gem activation chain (ferrum, websocket-driver,
+    # nokogiri native ext). A broken runtime or wrapper PATH would pass
+    # --help but fail --version, so test both.
     assert_match "Usage: browserctl", shell_output("#{bin}/browserctl --help 2>&1")
+    assert_match(/browserd \d+\.\d+\.\d+/, shell_output("#{bin}/browserd --version 2>&1"))
   end
 
   private
