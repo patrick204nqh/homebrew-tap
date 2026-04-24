@@ -8,15 +8,15 @@ class Browserctl < Formula
   license "MIT"
 
   bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-21"
-    rebuild 4
-    sha256 cellar: :any, arm64_sequoia: "fc80c139490558c6281448aa46b63db48dedb0e2b17ef25decdf349fd8e79f6b"
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-24"
+    rebuild 5
+    sha256 cellar: :any, arm64_sequoia: "30a97dac32190aba3ab3a03acdbc3860e024b98d223c592ef5b64acee37dbcea"
   end
 
   depends_on "gmp"
 
   # Bundled Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
-  # Avoids depending on homebrew-core's `ruby` (which pulls in llvm) so bottles
+  # Avoids depending on homebrew-core's `ruby` (which pulls in llvm), so bottles
   # work on any Homebrew prefix without source compilation.
   #
   # To update: run the build-ruby-runtime workflow for the desired version, then
