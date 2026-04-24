@@ -20,7 +20,9 @@ concurrency:
 
 jobs:
   detect:
-    name: Detect Formulas
+    # Named distinctly from validate.yml's Detect Formulas so both workflows'
+    # check rows are distinguishable in the PR UI.
+    name: Detect Bottle Targets
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -75,16 +77,6 @@ jobs:
 
       - uses: ./.github/actions/setup-tap
         if: steps.check.outputs.skip != 'true'
-
-      # setup-tap runs `brew update` which fetches from the tap's git remote.
-      # Since the tap is symlinked to this workspace, that fetch can reset
-      # our working tree to main's state (with the old bottle URLs).
-      # Force the workspace back to the PR branch tip here.
-      - name: Sync workspace to PR branch (after brew update)
-        if: steps.check.outputs.skip != 'true'
-        run: |
-          git fetch origin "${{ github.head_ref }}"
-          git reset --hard "origin/${{ github.head_ref }}"
 
       - name: Compute release metadata
         id: meta
@@ -183,13 +175,6 @@ jobs:
           ref: ${{ github.head_ref }}
 
       - uses: ./.github/actions/setup-tap
-
-      # setup-tap runs `brew update` which can reset the workspace to main's
-      # state. Force it back to the PR branch tip before installing.
-      - name: Sync workspace to PR branch (after brew update)
-        run: |
-          git fetch origin "${{ github.head_ref }}"
-          git reset --hard "origin/${{ github.head_ref }}"
 
       - name: Install from bottle and verify
         env:

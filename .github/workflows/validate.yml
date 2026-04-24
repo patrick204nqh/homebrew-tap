@@ -49,17 +49,33 @@ jobs:
           base_ref: ${{ github.base_ref }}
 
   audit:
+    # Always runs (no job-level `if:`) so the check reports SUCCESS on every
+    # PR, including workflow-only changes with no formula diff. Prevents the
+    # "some checks were not successful" SKIPPED marker in the merge box.
     name: Audit
     needs: detect
-    if: needs.detect.outputs.formulas != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
     steps:
+      - name: Gate
+        id: gate
+        env:
+          FORMULAS: ${{ needs.detect.outputs.formulas }}
+        run: |
+          if [ "$FORMULAS" = "[]" ]; then
+            echo "No formula changes — nothing to audit."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
       - uses: ./.github/actions/setup-tap
+        if: steps.gate.outputs.run == 'true'
       - name: Audit and style-check formulas
+        if: steps.gate.outputs.run == 'true'
         env:
           FORMULAS: ${{ needs.detect.outputs.formulas }}
         run: |
