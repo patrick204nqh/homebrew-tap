@@ -41,19 +41,40 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
+      # The bottle-commit step pushes back to the PR branch with an app token,
+      # which retriggers this workflow. On the second run the bottle block is
+      # already current, so short-circuit here before paying for setup-tap
+      # (~2-3 min Homebrew install) or metadata.
+      - name: Check if bottle already current
+        id: check
+        env:
+          FORMULA: ${{ matrix.formula }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          expected_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/tap-pr-${PR_NUMBER}"
+          if grep -qF "root_url \"${expected_url}\"" "Formula/${FORMULA}.rb"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Bottle block already matches ${expected_url} — skipping build."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: ./.github/actions/setup-tap
+        if: steps.check.outputs.skip != 'true'
 
       # setup-tap runs `brew update` which fetches from the tap's git remote.
       # Since the tap is symlinked to this workspace, that fetch can reset
       # our working tree to main's state (with the old bottle URLs).
       # Force the workspace back to the PR branch tip here.
       - name: Sync workspace to PR branch (after brew update)
+        if: steps.check.outputs.skip != 'true'
         run: |
           git fetch origin "${{ github.head_ref }}"
           git reset --hard "origin/${{ github.head_ref }}"
 
       - name: Compute release metadata
         id: meta
+        if: steps.check.outputs.skip != 'true'
         env:
           FORMULA: ${{ matrix.formula }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -64,22 +85,6 @@ jobs:
           echo "version=$version"   >> "$GITHUB_OUTPUT"
           echo "tag=$tag"           >> "$GITHUB_OUTPUT"
           echo "root_url=$root_url" >> "$GITHUB_OUTPUT"
-
-      # The bottle-commit step pushes back to the PR branch with an app token,
-      # which retriggers this workflow. On the second run the bottle block is
-      # already current, so skip the expensive rebuild/upload/commit.
-      - name: Check if bottle already current
-        id: check
-        env:
-          FORMULA: ${{ matrix.formula }}
-          EXPECTED_URL: ${{ steps.meta.outputs.root_url }}
-        run: |
-          if grep -qF "root_url \"${EXPECTED_URL}\"" "Formula/${FORMULA}.rb"; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Bottle block already matches ${EXPECTED_URL} — skipping build."
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Create prerelease (if absent)
         if: steps.check.outputs.skip != 'true'

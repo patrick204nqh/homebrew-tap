@@ -12,13 +12,14 @@ name: Build Ruby Runtime
 #   Frequency: infrequent — typically once or twice per year.
 #
 # ─── NOT NEEDED WHEN ────────────────────────────────────────────────────────
-# • A formula's own version bumps (ci.yml / snapshot.yml handle those).
+# • A formula's own version bumps (ci.yml handles bottling; release.yml
+#   publishes after merge).
 # • Adding a new formula — it reuses the existing runtime release.
 #
 # ─── AFTER RUNNING ──────────────────────────────────────────────────────────
 # The workflow automatically opens a PR updating the sha256 in every formula
-# that references ruby-runtime.  Review and merge the PR — the push to main
-# triggers build-bottles, which rebuilds and publishes bottles.
+# that references ruby-runtime.  Review and merge the PR — ci.yml builds and
+# verifies new bottles before merge; release.yml publishes them on merge.
 # ────────────────────────────────────────────────────────────────────────────
 on:
   workflow_dispatch:
@@ -150,7 +151,7 @@ jobs:
           fi
 
           git commit -m "fix: update ruby-runtime sha256 for ${RUBY_VERSION}"
-          git push --force origin "$BRANCH"
+          git push --force-with-lease origin "$BRANCH"
 
           existing=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
           if [ -n "$existing" ]; then

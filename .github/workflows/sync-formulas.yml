@@ -22,7 +22,6 @@ jobs:
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
           entries=()
 
@@ -53,9 +52,7 @@ jobs:
 
             echo "  current=$current_version  latest=$latest_version"
 
-            # schedule: skip formulas already at latest.
-            # workflow_dispatch: always include — enforce latest for full rebuild.
-            if [ "$EVENT_NAME" = "schedule" ] && [ "$current_version" = "$latest_version" ]; then
+            if [ "$current_version" = "$latest_version" ]; then
               echo "  Up to date, skipping."
               continue
             fi
@@ -138,11 +135,10 @@ jobs:
           fi
 
           summary=$(echo "$UPDATES" | jq -r \
-            '.[] | select(.current != .latest) | "- `\(.name)`: \(.current) → \(.latest)"' \
-            | tr '\n' '\n')
+            '.[] | select(.current != .latest) | "- `\(.name)`: \(.current) → \(.latest)"')
 
           git commit -m "chore: sync formula versions"
-          git push --force origin "$branch"
+          git push --force-with-lease origin "$branch"
 
           existing=$(gh pr list --head "$branch" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
