@@ -16,7 +16,7 @@ class Browserctl < Formula
   depends_on "gmp"
 
   # Bundled Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
-  # Avoids depending on homebrew-core's `ruby` (which pulls in llvm) so bottles
+  # Avoids depending on homebrew-core's `ruby` (which pulls in llvm), so bottles
   # work on any Homebrew prefix without source compilation.
   #
   # To update: run the build-ruby-runtime workflow for the desired version, then
