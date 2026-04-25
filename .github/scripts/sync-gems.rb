@@ -6,6 +6,7 @@
 #
 # Usage: sync-gems.rb [formula_files...]
 
+require "English"
 require "net/http"
 require "json"
 require "digest"
@@ -16,10 +17,7 @@ RUBYGEMS_DOWN = "https://rubygems.org/downloads"
 
 # Matches single-line rubygems.org resource blocks (excludes ruby-runtime,
 # whose URL spans multiple lines with \ continuation).
-RESOURCE_RE = /^([ \t]*)resource "([^"]+)" do\n[ \t]*url "(https:\/\/rubygems\.org\/downloads\/([^"]+)\.gem)"\n[ \t]*sha256 "([a-f0-9]{64})"\n[ \t]*end[ \t]*\n?/
-
-@version_cache = {}
-@sha_cache     = {}
+RESOURCE_RE = %r{^([ \t]*)resource "([^"]+)" do\n[ \t]*url "(https://rubygems\.org/downloads/([^"]+)\.gem)"\n[ \t]*sha256 "([a-f0-9]{64})"\n[ \t]*end[ \t]*\n?}
 
 def http_get(url, max_redirects: 5)
   uri = URI(url)
@@ -34,30 +32,32 @@ def http_get(url, max_redirects: 5)
       when "301", "302", "303", "307", "308"
         loc = res["location"]
         uri = URI(loc.start_with?("http") ? loc : "#{uri.scheme}://#{uri.host}#{loc}")
-      else
+      else # rubocop:disable Lint/DuplicateBranch
         return res
       end
     end
   end
   nil
-rescue => e
+rescue StandardError => e
   warn "  HTTP error #{url}: #{e.message}"
   nil
 end
 
-def latest_gem_version(gem_name)
-  return @version_cache[gem_name] if @version_cache.key?(gem_name)
-  sleep 0.15  # courteous to RubyGems.org rate limits
+def latest_gem_version(gem_name, cache:)
+  return cache[gem_name] if cache.key?(gem_name)
+
+  sleep 0.15 # courteous to RubyGems.org rate limits
   res = http_get("#{RUBYGEMS_API}/#{gem_name}.json")
-  @version_cache[gem_name] = res&.code == "200" ? JSON.parse(res.body)["version"] : nil
+  cache[gem_name] = res&.code == "200" ? JSON.parse(res.body)["version"] : nil
 rescue JSON::ParserError
-  @version_cache[gem_name] = nil
+  cache[gem_name] = nil
 end
 
-def sha256_for_url(url)
-  return @sha_cache[url] if @sha_cache.key?(url)
+def sha256_for_url(url, cache:)
+  return cache[url] if cache.key?(url)
+
   res = http_get(url)
-  @sha_cache[url] = res&.code == "200" ? Digest::SHA256.hexdigest(res.body) : nil
+  cache[url] = res&.code == "200" ? Digest::SHA256.hexdigest(res.body) : nil
 end
 
 def parse_version_platform(stem, gem_name)
@@ -68,19 +68,19 @@ def parse_version_platform(stem, gem_name)
   m ? [m[1], m[2]] : [suffix, nil]
 end
 
-def process_formula(path)
+def process_formula(path, version_cache:, sha_cache:)
   content = File.read(path)
   updates = []
 
   new_content = content.gsub(RESOURCE_RE) do |match|
-    indent   = $~[1]
-    gem_name = $~[2]
-    stem     = $~[4]
+    indent   = $LAST_MATCH_INFO[1]
+    gem_name = $LAST_MATCH_INFO[2]
+    stem     = $LAST_MATCH_INFO[4]
     inner    = "#{indent}  "
 
     old_version, platform = parse_version_platform(stem, gem_name)
 
-    latest = latest_gem_version(gem_name)
+    latest = latest_gem_version(gem_name, cache: version_cache)
     if latest.nil?
       warn "  #{gem_name}: API fetch failed, skipping"
       next match
@@ -88,12 +88,12 @@ def process_formula(path)
 
     next match if latest == old_version
 
-    filename = [gem_name, latest, platform].compact.join("-") + ".gem"
+    filename = "#{[gem_name, latest, platform].compact.join("-")}.gem"
     new_url  = "#{RUBYGEMS_DOWN}/#{filename}"
-    new_sha  = sha256_for_url(new_url)
+    new_sha  = sha256_for_url(new_url, cache: sha_cache)
 
     if new_sha.nil?
-      warn "  #{gem_name}: #{latest} not downloadable#{platform ? " (#{platform})" : ""}, skipping"
+      warn "  #{gem_name}: #{latest} not downloadable#{" (#{platform})" if platform}, skipping"
       next match
     end
 
@@ -107,11 +107,13 @@ end
 
 formulas = ARGV.empty? ? Dir["Formula/*.rb"] : ARGV
 all_updates = {}
+version_cache = {}
+sha_cache = {}
 
 formulas.each do |path|
   name = File.basename(path, ".rb")
   puts "Checking #{name}..."
-  updates = process_formula(path)
+  updates = process_formula(path, version_cache: version_cache, sha_cache: sha_cache)
   all_updates[name] = updates unless updates.empty?
   puts updates.empty? ? "  up to date" : "  #{updates.size} update(s)"
 end
@@ -121,13 +123,13 @@ summary_lines = all_updates.map do |formula, updates|
 end
 
 body = if summary_lines.empty?
-  "All gems up to date.\n"
-else
-  "Automated weekly gem version sync.\n\n" \
-  "## Updates\n\n" \
-  "#{summary_lines.join("\n")}\n\n" \
-  "CI will build and verify bottles before this PR can be merged.\n"
-end
+         "All gems up to date.\n"
+       else
+         "Automated weekly gem version sync.\n\n" \
+           "## Updates\n\n" \
+           "#{summary_lines.join("\n")}\n\n" \
+           "CI will build and verify bottles before this PR can be merged.\n"
+       end
 
 File.write("sync_gems_summary.md", body)
 puts summary_lines.empty? ? "\nAll gems up to date." : "\n#{summary_lines.join("\n")}"
