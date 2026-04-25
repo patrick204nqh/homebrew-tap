@@ -13,16 +13,10 @@ formulas.each do |path|
   src = File.read(path)
   next unless src.include?('resource "ruby-runtime"')
 
-  in_resource = false
-  patched = src.each_line.map do |line|
-    in_resource = true if line.include?('resource "ruby-runtime"')
-    if in_resource && line.match?(/^\s+sha256 "[a-f0-9]{64}"/)
-      in_resource = false
-      line.sub(/"[a-f0-9]{64}"/, "\"#{new_sha}\"")
-    else
-      line
-    end
-  end.join
+  patched = src.sub(
+    /(resource\s+"ruby-runtime"\s+do\b.*?^\s+sha256\s+)"[a-f0-9]{64}"/m,
+    "\\1\"#{new_sha}\""
+  )
 
   if patched == src
     warn "WARNING: no sha256 updated in #{path}"

@@ -45,12 +45,14 @@ Pathname.glob("#{prefix}/bin/*").each do |f|
 
   raw = f.binread
   next unless raw.start_with?("#!")
-  next unless raw[0, raw.index("\n") || raw.size].include?("ruby")
 
-  new_content = shebang + raw[raw.index("\n") || raw.size..]
+  nl = raw.index("\n") || raw.size
+  next unless raw[0, nl].include?("ruby")
+
+  new_content = shebang + raw[nl..]
   next if new_content == raw
 
   mode = f.stat.mode & 0o7777
-  File.open(f.to_s, "wb") { |io| io.write(new_content) }
+  File.binwrite(f.to_s, new_content)
   File.chmod(mode, f.to_s)
 end
