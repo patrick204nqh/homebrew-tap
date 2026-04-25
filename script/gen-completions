@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Generates completions/_browserctl (zsh) and completions/browserctl.bash
-# from the browserctl gem source on GitHub.
+# Updates the browserctl formula's embedded shell completions from the
+# browserctl gem source on GitHub.
 #
 # Usage:
 #   script/gen-completions               # reads version from Formula/browserctl.rb
@@ -14,11 +14,10 @@ require "net/http"
 require "json"
 require "uri"
 require "base64"
-require "fileutils"
 
-REPO     = "patrick204nqh/browserctl"
-TAP_ROOT = File.expand_path("..", __dir__)
-OUT_DIR  = File.join(TAP_ROOT, "completions")
+REPO         = "patrick204nqh/browserctl"
+TAP_ROOT     = File.expand_path("..", __dir__)
+FORMULA_PATH = File.join(TAP_ROOT, "Formula/browserctl.rb")
 
 # CLI name → lib/browserctl/commands/<file>.rb base name (when they differ)
 FILE_ALIASES = {
@@ -404,6 +403,18 @@ def generate_bash(commands, record_stop_flags) # rubocop:disable Metrics/Cycloma
 end
 
 # ---------------------------------------------------------------------------
+# Formula patcher
+# ---------------------------------------------------------------------------
+
+def patch_formula_heredoc(formula, method_name, label, new_content)
+  lines = new_content.each_line.map { |l| l.chomp.empty? ? "" : "      #{l.chomp}" }
+  embedded = "#{lines.join("\n")}\n"
+  formula.sub(/(  def #{method_name}\n    <<~'?#{label}'?[^\n]*\n).*?(    #{label}\n)/m) do
+    "#{Regexp.last_match(1)}#{embedded}#{Regexp.last_match(2)}"
+  end
+end
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -427,10 +438,8 @@ record_stop     = data[:record_stop_flags]
 zsh_src  = generate_zsh(commands, record_stop)
 bash_src = generate_bash(commands, record_stop)
 
-FileUtils.mkdir_p(OUT_DIR)
-File.write(File.join(OUT_DIR, "_browserctl"),      zsh_src)
-File.write(File.join(OUT_DIR, "browserctl.bash"),  bash_src)
-
-puts "Written:"
-puts "  #{OUT_DIR}/_browserctl"
-puts "  #{OUT_DIR}/browserctl.bash"
+formula = File.read(FORMULA_PATH)
+formula = patch_formula_heredoc(formula, "bash_completion_script", "BASH", bash_src)
+formula = patch_formula_heredoc(formula, "zsh_completion_script",  "ZSH",  zsh_src)
+File.write(FORMULA_PATH, formula)
+puts "Updated #{FORMULA_PATH}"

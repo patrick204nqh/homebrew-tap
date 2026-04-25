@@ -128,13 +128,13 @@ jobs:
             echo "Updated $name: $current → $latest"
 
             if [ -x "script/gen-completions" ] && \
-               { [ -f "completions/${name}.bash" ] || [ -f "completions/_${name}" ]; }; then
+               grep -q "def bash_completion_script" "Formula/${name}.rb" 2>/dev/null; then
               echo "Regenerating completions for $name..."
               ruby script/gen-completions "$latest" || true
             fi
           done < <(echo "$UPDATES" | jq -c '.[]')
 
-          git add Formula/ completions/
+          git add Formula/
           if git diff --cached --quiet; then
             echo "No formula changes to commit."
             exit 0

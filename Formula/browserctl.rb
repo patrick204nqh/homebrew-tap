@@ -117,8 +117,8 @@ class Browserctl < Formula
     (bin / "browserctl").write_env_script(libexec / "bin/browserctl", env)
     (bin / "browserd").write_env_script(libexec / "bin/browserd", env)
 
-    bash_completion.install tap.path / "completions/browserctl.bash"
-    zsh_completion.install tap.path / "completions/_browserctl"
+    (bash_completion / "browserctl").write bash_completion_script
+    (zsh_completion / "_browserctl").write zsh_completion_script
   end
 
   def post_install
@@ -174,6 +174,241 @@ class Browserctl < Formula
   end
 
   private
+
+  def bash_completion_script
+    <<~BASH
+      _browserctl() {
+        local cur prev words cword
+        _init_completion || return
+
+        local all_cmds="run workflows describe record init open close pages goto fill click shot snap url eval watch pause resume inspect cookies set-cookie clear-cookies ping shutdown"
+
+        # Find the real command, skipping --daemon <name> if present
+        local cmd="" cmd_idx=1
+        local i=1
+        while [[ $i -lt ${#words[@]} ]]; do
+          case "${words[$i]}" in
+            --daemon)
+              (( i += 2 ))
+              (( cmd_idx += 2 ))
+              ;;
+            --version|-v|--help|-h)
+              (( i++ ))
+              ;;
+            --*)
+              (( i++ ))
+              ;;
+            *)
+              cmd="${words[$i]}"
+              cmd_idx=$i
+              break
+              ;;
+          esac
+        done
+
+        if [[ $cword -le $cmd_idx ]]; then
+          COMPREPLY=($(compgen -W "$all_cmds --daemon --version --help" -- "$cur"))
+          return
+        fi
+
+        case $cmd in
+          run)
+            case $prev in
+              --params) COMPREPLY=($(compgen -f -- "$cur")); return ;;
+            esac
+            if [[ $cur == -* ]]; then
+              COMPREPLY=($(compgen -W "--params" -- "$cur"))
+            else
+              COMPREPLY=($(compgen -f -- "$cur"))
+            fi
+            ;;
+          record)
+            local subcmd="${words[$((cmd_idx + 1))]}"
+            if [[ $cword -eq $((cmd_idx + 1)) ]]; then
+              COMPREPLY=($(compgen -W "start stop status" -- "$cur"))
+            elif [[ $subcmd == "stop" && $cur == -* ]]; then
+              case $prev in
+                --out|-o) COMPREPLY=($(compgen -f -- "$cur")); return ;;
+              esac
+              COMPREPLY=($(compgen -W "--out" -- "$cur"))
+            fi
+            ;;
+          open)
+            case $prev in
+              --url|-u) return ;;
+            esac
+            [[ $cur == -* ]] && COMPREPLY=($(compgen -W "--url" -- "$cur"))
+            ;;
+          fill)
+            case $prev in
+              --ref|-r) return ;;
+              --value|-V) return ;;
+            esac
+            [[ $cur == -* ]] && COMPREPLY=($(compgen -W "--ref --value" -- "$cur"))
+            ;;
+          click)
+            case $prev in
+              --ref|-r) return ;;
+            esac
+            [[ $cur == -* ]] && COMPREPLY=($(compgen -W "--ref" -- "$cur"))
+            ;;
+          shot)
+            case $prev in
+              --out|-o) COMPREPLY=($(compgen -f -- "$cur")); return ;;
+            esac
+            [[ $cur == -* ]] && COMPREPLY=($(compgen -W "--out --full" -- "$cur"))
+            ;;
+          snap)
+            case $prev in
+              --format|-f) COMPREPLY=($(compgen -W "ai html" -- "$cur")); return ;;
+            esac
+            [[ $cur == -* ]] && COMPREPLY=($(compgen -W "--format --diff" -- "$cur"))
+            ;;
+          watch)
+            case $prev in
+              --timeout|-t) return ;;
+            esac
+            [[ $cur == -* ]] && COMPREPLY=($(compgen -W "--timeout" -- "$cur"))
+            ;;
+        esac
+      }
+
+      complete -F _browserctl browserctl
+    BASH
+  end
+
+  def zsh_completion_script
+    <<~'ZSH'
+      #compdef browserctl
+
+      _browserctl_cmds=(
+        'run:Run a workflow'
+        'workflows:List available workflows'
+        'describe:Describe a workflow'
+        'record:Record browser commands into a workflow'
+        'init:Scaffold .browserctl/ in this project'
+        'open:Open or focus a named page'
+        'close:Close a named page'
+        'pages:List open pages'
+        'goto:Navigate a page to a URL'
+        'fill:Fill an input on a page'
+        'click:Click an element on a page'
+        'shot:Take a screenshot of a page'
+        'snap:Snapshot DOM of a page'
+        'url:Print current URL of a page'
+        'eval:Evaluate a JS expression on a page'
+        'watch:Wait for a CSS selector to appear'
+        'pause:Pause automation — browser stays live'
+        'resume:Resume automation after manual action'
+        'inspect:Open Chrome DevTools for a named page'
+        'cookies:List all cookies as JSON'
+        'set-cookie:Set a cookie on a page'
+        'clear-cookies:Clear all cookies for a page'
+        'ping:Check if browserd is alive'
+        'shutdown:Stop browserd'
+      )
+
+      _browserctl_record_cmds=(
+        'start:Start recording browser commands'
+        'stop:Stop recording and save workflow'
+        'status:Show active recording name'
+      )
+
+      _browserctl() {
+        local context state state_descr line
+        typeset -A opt_args
+
+        _arguments -C \
+          '(--version -v)'{--version,-v}'[Print version and exit]' \
+          '(--help -h)'{--help,-h}'[Show help]' \
+          '--daemon=[Connect to named daemon instance]:daemon name:' \
+          '1: :->command' \
+          '*:: :->args'
+
+        case $state in
+          command)
+            _describe -t commands 'browserctl command' _browserctl_cmds
+            ;;
+          args)
+            case $line[1] in
+              run)
+                _arguments \
+                  '--params=[Parameters file]:file:_files' \
+                  '1:workflow name or file:_files'
+                ;;
+              describe)
+                _arguments '1:workflow name:'
+                ;;
+              record)
+                _arguments -C \
+                  '1: :->subcmd' \
+                  '*:: :->subargs'
+                case $state in
+                  subcmd)
+                    _describe -t subcommands 'record subcommand' _browserctl_record_cmds
+                    ;;
+                  subargs)
+                    case $line[1] in
+                      stop)
+                        _arguments \
+                          '(-o --out)'{-o,--out}'=[Output path for workflow file]:file:_files'
+                        ;;
+                    esac
+                    ;;
+                esac
+                ;;
+              open)
+                _arguments \
+                  '(-u --url)'{-u,--url}'=[URL to navigate to]:url:' \
+                  '1:page name:'
+                ;;
+              fill)
+                _arguments \
+                  '(-r --ref)'{-r,--ref}'=[Snapshot ref to fill]:ref:' \
+                  '(-V --value)'{-V,--value}'=[Value to fill]:value:' \
+                  '1:page name:'
+                ;;
+              click)
+                _arguments \
+                  '(-r --ref)'{-r,--ref}'=[Snapshot ref to click]:ref:' \
+                  '1:page name:'
+                ;;
+              shot)
+                _arguments \
+                  '(-o --out)'{-o,--out}'=[Output file path]:file:_files' \
+                  '(-f --full)'{-f,--full}'[Capture full page]' \
+                  '1:page name:'
+                ;;
+              snap)
+                _arguments \
+                  '(-f --format)'{-f,--format}'=[Output format\: ai or html]:format:(ai html)' \
+                  '(-d --diff)'{-d,--diff}'[Return only changed elements]' \
+                  '1:page name:'
+                ;;
+              watch)
+                _arguments \
+                  '(-t --timeout)'{-t,--timeout}'=[Seconds to wait (default\: 30)]:timeout:' \
+                  '1:page name:' \
+                  '2:CSS selector:'
+                ;;
+              set-cookie)
+                _arguments \
+                  '1:page name:' \
+                  '2:cookie name:' \
+                  '3:cookie value:' \
+                  '4:domain:'
+                ;;
+              workflows|init|close|pages|goto|url|eval|pause|resume|inspect|cookies|clear-cookies|ping|shutdown)
+                _arguments '1:page name:'
+                ;;
+            esac
+            ;;
+        esac
+      }
+
+      _browserctl "$@"
+    ZSH
+  end
 
   def relocate_runtime(ruby_runtime)
     system "ruby", (ruby_runtime / "relocate-runtime.rb").to_s, ruby_runtime.to_s
