@@ -78,10 +78,6 @@ jobs:
           # Extract PR number from tag (tap-pr-N)
           pr_number=$(echo "$tag" | grep -oP '(?<=tap-pr-)\d+' || true)
 
-          # Build asset list
-          assets=$(gh release view "$tag" --json assets \
-            -q '.assets[] | "- `\(.name)`"')
-
           # Compose release body
           if [ -n "$pr_number" ]; then
             pr_ref="merged via [PR #${pr_number}](https://github.com/${GITHUB_REPOSITORY}/pull/${pr_number})"
@@ -89,8 +85,7 @@ jobs:
             pr_ref="deployed to \`main\`"
           fi
 
-          body="$(printf 'Bottles for \`%s\` v%s — built and verified by CI, %s.\n\n## Assets\n\n%s' \
-            "$FORMULA" "$version" "$pr_ref" "$assets")"
+          body="Bottles for \`${FORMULA}\` v${version} — built and verified by CI, ${pr_ref}."
 
           is_prerelease=$(gh release view "$tag" --json isPrerelease -q '.isPrerelease')
           if [ "$is_prerelease" = "true" ]; then
