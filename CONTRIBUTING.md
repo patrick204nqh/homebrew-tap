@@ -13,7 +13,9 @@ change goes through a PR — nothing is committed directly to `main` by bots.
 | [`cleanup.yml`](.github/workflows/cleanup.yml) | Pull request close (not merged) | Delete the prerelease snapshot created during CI |
 | [`release.yml`](.github/workflows/release.yml) | Push to `main` (Formula/** only) · manual dispatch | Publish the prerelease bottle built during PR CI |
 | [`sync-formulas.yml`](.github/workflows/sync-formulas.yml) | Weekly schedule (Sun 23:00 UTC) · manual dispatch | Detect new upstream versions · open a PR with updated formulas |
-| [`build-ruby-runtime.yml`](.github/workflows/build-ruby-runtime.yml) | Manual dispatch only | Build a relocatable arm64 Ruby runtime · publish to `ruby-runtime-X.Y.Z` release · open PR to update sha256 in all formulas |
+| [`sync-gems.yml`](.github/workflows/sync-gems.yml) | Weekly schedule (Sun 22:00 UTC) · manual dispatch | Check bundled gem resource blocks for newer versions · open a PR with updates |
+| [`sync-ruby-runtime.yml`](.github/workflows/sync-ruby-runtime.yml) | Weekly schedule (Sun 21:00 UTC) · manual dispatch | Check for newer Ruby patch in ruby-build · trigger `build-ruby-runtime.yml` automatically |
+| [`build-ruby-runtime.yml`](.github/workflows/build-ruby-runtime.yml) | Manual dispatch · triggered by `sync-ruby-runtime.yml` | Build a relocatable arm64 Ruby runtime · publish to `ruby-runtime-X.Y.Z` release · open PR to update sha256 in all formulas |
 
 **PR flow:** `validate.yml` and `bottle.yml` run in parallel. `validate.yml`
 covers human-authored checks (lint, audit). `bottle.yml` builds the bottle,
@@ -26,8 +28,21 @@ See [CI pipeline diagrams](docs/architecture/diagrams/ci-pipelines.md) for visua
 
 ## Adding a new formula
 
-1. Create `Formula/<tool-name>.rb` following the formula conventions below.
-2. Test locally before opening a PR:
+Use the generator to scaffold the formula with the correct ruby-runtime pattern:
+
+```bash
+script/new-formula <tool-name> <github-owner/repo>
+# e.g. script/new-formula my-tool patrick204nqh/my-tool
+```
+
+The generator reads the current `RUBY_RUNTIME_VERSION` and sha256 from an
+existing formula so the new one starts in sync. It prints a TODO checklist
+with the remaining steps.
+
+1. Fill in `desc`, `url`, `sha256`, and `license` in the generated formula.
+2. Add gem `resource` blocks for each runtime dependency from the upstream
+   `Gemfile.lock` (see [Formula conventions](#formula-conventions) below).
+3. Test locally before opening a PR:
 
    ```bash
    brew install --build-from-source ./Formula/<tool-name>.rb
@@ -37,10 +52,10 @@ See [CI pipeline diagrams](docs/architecture/diagrams/ci-pipelines.md) for visua
    bundle exec rubocop Formula/<tool-name>.rb
    ```
 
-3. Open a PR. `validate.yml` and `bottle.yml` run automatically in parallel:
+4. Open a PR. `validate.yml` and `bottle.yml` run automatically in parallel:
    - `validate.yml` — lints and audits the formula (human-authored checks)
    - `bottle.yml` — builds the bottle (installs from source + `brew test` as part of bottling), uploads it to a prerelease, commits the bottle block back to your PR branch, and smoke-tests the install from that bottle
-4. Review the CI results and merge. `release.yml` publishes the bottle.
+5. Review the CI results and merge. `release.yml` publishes the bottle.
 
 ## Updating an existing formula
 
@@ -54,6 +69,21 @@ To trigger an out-of-band update immediately:
 1. Go to **Actions → Sync Formulas → Run workflow**.
 2. Review the opened PR and merge when CI passes.
 
+## Updating bundled gem versions
+
+Each Ruby-based formula pins its gem dependencies as `resource` blocks.
+[`sync-gems.yml`](.github/workflows/sync-gems.yml) checks RubyGems.org weekly
+(Sunday 22:00 UTC) for newer versions of those gems and opens a PR with
+any updates. CI builds and verifies new bottles before you merge.
+
+To trigger an out-of-band check immediately:
+
+1. Go to **Actions → Sync Gems → Run workflow**.
+2. Review the opened PR (one PR covers all formulas) and merge when CI passes.
+
+> **Note:** `sync-gems.yml` only bumps the gem `resource` blocks. It does not
+> update the formula's own source version — that is handled by `sync-formulas.yml`.
+
 ## Updating the bundled Ruby runtime
 
 Formulas in this tap bundle a relocatable Ruby runtime instead of depending on
@@ -61,7 +91,11 @@ Homebrew's `ruby` formula (which would pull in `llvm` and force source
 compilation). The runtime is built once and shared across all Ruby-based
 formulas.
 
-To upgrade the runtime version:
+[`sync-ruby-runtime.yml`](.github/workflows/sync-ruby-runtime.yml) runs weekly
+(Sunday 21:00 UTC) and triggers `build-ruby-runtime.yml` automatically when a
+newer patch release is available in ruby-build.
+
+To upgrade the runtime manually (e.g. for an out-of-band security patch):
 
 1. Go to **Actions → Build Ruby Runtime → Run workflow** and enter the new
    version (e.g. `3.3.7`).

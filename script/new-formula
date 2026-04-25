@@ -1,0 +1,176 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Scaffolds a new Ruby-based Homebrew formula using this tap's shared
+# ruby-runtime pattern. Reads the current runtime version and sha256 from
+# an existing formula so new formulas always start in sync.
+#
+# Usage: script/new-formula <name> <github-owner/repo> [--bin <binary>]
+#
+#   name              Formula name in kebab-case, e.g. my-tool
+#   github-owner/repo Upstream GitHub repo, e.g. acme/my-tool
+#   --bin <binary>    Binary name installed to PATH (default: same as name)
+
+USAGE = <<~TEXT
+  Usage: script/new-formula <name> <github-owner/repo> [--bin <binary>]
+
+    name              Formula name in kebab-case (letters, numbers, hyphens)
+    github-owner/repo Upstream GitHub repo, e.g. patrick204nqh/my-tool
+    --bin <binary>    Binary name (default: same as formula name)
+
+  Examples:
+    script/new-formula my-tool patrick204nqh/my-tool
+    script/new-formula sumo-export patrick204nqh/sumo-export --bin sumo-export
+TEXT
+
+if ARGV.include?("-h") || ARGV.include?("--help")
+  puts USAGE
+  exit 0
+end
+
+abort USAGE if ARGV.length < 2
+
+name = ARGV[0]
+repo = ARGV[1]
+bin_idx  = ARGV.index("--bin")
+bin_name = bin_idx ? ARGV[bin_idx + 1] : name
+
+abort "ERROR: name must be kebab-case (letters, numbers, hyphens only)" \
+  unless name.match?(/\A[a-z0-9][a-z0-9-]*\z/)
+abort "ERROR: repo must be owner/repo format" \
+  unless repo.match?(%r{\A[^/]+/[^/]+\z})
+abort "ERROR: --bin requires a value" if bin_name.nil?
+
+class_name = name.split("-").map(&:capitalize).join
+
+target = "Formula/#{name}.rb"
+abort "ERROR: #{target} already exists — edit it directly" if File.exist?(target)
+
+# Inherit runtime version + sha256 from an existing formula so the new one
+# stays in sync without requiring a manual lookup.
+runtime_version = nil
+runtime_sha     = nil
+Dir["Formula/*.rb"].each do |f|
+  src = File.read(f)
+  v = src.match(/RUBY_RUNTIME_VERSION\s*=\s*"([^"]+)"/)&.captures&.first
+  s = src.match(/resource\s+"ruby-runtime"\s+do\n.*?sha256\s+"([a-f0-9]{64})"/m)&.captures&.first
+  next unless v && s
+
+  runtime_version = v
+  runtime_sha     = s
+  break
+end
+
+abort "ERROR: no existing formula with ruby-runtime found — run from the repo root" \
+  unless runtime_version
+
+formula = <<~RUBY
+  # frozen_string_literal: true
+
+  class #{class_name} < Formula
+    desc "TODO: one-line description"
+    homepage "https://github.com/#{repo}"
+    url "https://github.com/#{repo}/archive/refs/tags/vTODO.tar.gz"
+    sha256 "TODO"
+    license "MIT"
+
+    depends_on "gmp"
+
+    # Bundled Ruby runtime — shared across all Ruby-based tap formulas.
+    # See docs/architecture/decisions/001-arm64-only-bottles.md.
+    RUBY_RUNTIME_VERSION = "#{runtime_version}"
+
+    resource "ruby-runtime" do
+      url "https://github.com/patrick204nqh/homebrew-tap/releases/download/" \\
+          "ruby-runtime-\#{RUBY_RUNTIME_VERSION}/" \\
+          "ruby-runtime-\#{RUBY_RUNTIME_VERSION}-arm64-darwin.tar.gz"
+      sha256 "#{runtime_sha}"
+    end
+
+    # Add runtime gem dependencies below. For each gem in the upstream Gemfile.lock,
+    # add a resource block with the pinned version and sha256:
+    #
+    #   resource "gem-name" do
+    #     url "https://rubygems.org/downloads/gem-name-VERSION.gem"
+    #     sha256 "SHA256"
+    #   end
+    #
+    # For gems with native extensions, use the arm64-darwin platform gem:
+    #   url "https://rubygems.org/downloads/nokogiri-VERSION-arm64-darwin.gem"
+    #
+    # Omit development/test gems.
+
+    def install
+      ruby_runtime = libexec / "ruby-runtime"
+      resource("ruby-runtime").stage { ruby_runtime.install Dir["*"] }
+
+      bundled_ruby = ruby_runtime / "bin/ruby"
+      bundled_gem  = ruby_runtime / "bin/gem"
+      gem_home     = libexec / "gems"
+
+      relocate_runtime(ruby_runtime)
+
+      ENV["GEM_HOME"] = gem_home
+
+      (resources - [resource("ruby-runtime")]).each do |r|
+        r.stage do
+          system bundled_gem, "install", r.cached_download,
+                 "--no-document", "--ignore-dependencies", "--install-dir", gem_home
+        end
+      end
+
+      libexec.install "lib"
+      (libexec / "bin").install "bin/#{bin_name}"
+
+      ruby_version = Utils.safe_popen_read(
+        bundled_ruby, "-e", "puts RbConfig::CONFIG['ruby_version']"
+      ).chomp
+      ruby_stdlib_gems = ruby_runtime / "lib/ruby/gems" / ruby_version
+
+      env = {
+        GEM_HOME: gem_home,
+        GEM_PATH: "\#{gem_home}\#{File::PATH_SEPARATOR}\#{ruby_stdlib_gems}",
+        PATH:     "\#{ruby_runtime / "bin"}\#{File::PATH_SEPARATOR}\#{ENV.fetch("PATH", nil)}",
+      }
+      (bin / "#{bin_name}").write_env_script(libexec / "bin/#{bin_name}", env)
+    end
+
+    def caveats
+      <<~EOS
+        TODO: add any setup or first-run instructions.
+
+        Run:
+          #{bin_name} --help
+      EOS
+    end
+
+    test do
+      assert_match "TODO", shell_output("\#{bin}/#{bin_name} --help 2>&1")
+    end
+
+    private
+
+    def relocate_runtime(ruby_runtime)
+      system "ruby", (ruby_runtime / "relocate-runtime.rb").to_s, ruby_runtime.to_s
+    end
+  end
+RUBY
+
+File.write(target, formula)
+File.chmod(0o644, target)
+
+puts <<~MSG
+  Created #{target}
+
+  Next steps:
+    1. Set the version, url, sha256, and license:
+         curl -fsSL https://github.com/#{repo}/archive/refs/tags/vX.Y.Z.tar.gz | shasum -a 256
+    2. Add gem resource blocks for each runtime dependency in the upstream Gemfile.lock.
+    3. Verify locally:
+         brew install --build-from-source ./#{target}
+         brew test patrick204nqh/tap/#{name}
+         brew audit --strict patrick204nqh/tap/#{name}
+         brew style #{target}
+         bundle exec rubocop #{target}
+    4. Open a PR — CI will build and verify the bottle automatically.
+MSG
