@@ -119,5 +119,9 @@ rationale behind arm64-only bottles.
 ## Local dev setup
 
 ```bash
-bundle install   # installs rubocop for linting
+bundle install          # installs rubocop + lefthook
+bundle exec lefthook install   # wires up the pre-commit hook
 ```
+
+The pre-commit hook runs `rubocop` on every commit, catching style issues
+before they reach CI.
