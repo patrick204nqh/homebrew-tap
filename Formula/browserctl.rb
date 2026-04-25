@@ -7,6 +7,11 @@ class Browserctl < Formula
   sha256 "a8f977dccdd22d419fa11adebeeddd0b9b82e71be1a110e2df9df3251f5a34c3"
   license "MIT"
 
+  bottle do
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-39"
+    sha256 cellar: :any, arm64_sequoia: "e2329caad8fe39d8dd0e32b261d5024195774dd1ef736ac28e0d4d4bcea166e5"
+  end
+
   depends_on "gmp"
 
   # Bundled Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
