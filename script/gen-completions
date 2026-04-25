@@ -1,0 +1,436 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Generates completions/_browserctl (zsh) and completions/browserctl.bash
+# from the browserctl gem source on GitHub.
+#
+# Usage:
+#   script/gen-completions               # reads version from Formula/browserctl.rb
+#   script/gen-completions <version>     # e.g. "0.4.0"
+#
+# Env: GITHUB_TOKEN or GH_TOKEN (optional, raises rate limits)
+
+require "net/http"
+require "json"
+require "uri"
+require "base64"
+require "fileutils"
+
+REPO     = "patrick204nqh/browserctl"
+TAP_ROOT = File.expand_path("..", __dir__)
+OUT_DIR  = File.join(TAP_ROOT, "completions")
+
+# CLI name → lib/browserctl/commands/<file>.rb base name (when they differ)
+FILE_ALIASES = {
+  "open" => "open_page",
+  "shot" => "screenshot",
+  "snap" => "snapshot",
+  "export-cookies" => "export_cookies",
+  "import-cookies" => "import_cookies",
+}.freeze
+
+# Commands handled inline in bin/browserctl (no dedicated command file, no flags)
+INLINE_CMDS = %w[close pages goto url eval cookies set-cookie clear-cookies ping shutdown workflows describe].freeze
+
+# Human-readable descriptions — update when new commands are added upstream
+DESCS = {
+  "init" => "Scaffold .browserctl/ in this project",
+  "open" => "Open or focus a named page",
+  "close" => "Close a named page",
+  "pages" => "List open pages",
+  "goto" => "Navigate a page to a URL",
+  "fill" => "Fill an input on a page",
+  "click" => "Click an element on a page",
+  "url" => "Print current URL of a page",
+  "eval" => "Evaluate a JS expression on a page",
+  "watch" => "Wait for a CSS selector to appear",
+  "snap" => "Snapshot DOM of a page",
+  "shot" => "Take a screenshot of a page",
+  "pause" => "Pause automation — browser stays live",
+  "resume" => "Resume automation after manual action",
+  "inspect" => "Open Chrome DevTools for a named page",
+  "cookies" => "List all cookies as JSON",
+  "set-cookie" => "Set a cookie on a page",
+  "clear-cookies" => "Clear all cookies for a page",
+  "export-cookies" => "Export cookies to a JSON file",
+  "import-cookies" => "Import cookies from a JSON file",
+  "run" => "Run a workflow",
+  "workflows" => "List available workflows",
+  "describe" => "Describe a workflow",
+  "record" => "Record browser commands into a workflow",
+  "ping" => "Check if browserd is alive",
+  "status" => "Show daemon status, PID, and open pages",
+  "shutdown" => "Stop browserd",
+}.freeze
+
+# Flags whose argument should be completed as a file path
+FILE_FLAGS = %w[--out --params].freeze
+
+# ---------------------------------------------------------------------------
+# GitHub API helpers
+# ---------------------------------------------------------------------------
+
+def github_fetch(path, ref)
+  token = ENV["GITHUB_TOKEN"] || ENV.fetch("GH_TOKEN", nil)
+  uri   = URI("https://api.github.com/repos/#{REPO}/contents/#{path}?ref=v#{ref}")
+  req   = Net::HTTP::Get.new(uri)
+  req["Accept"]        = "application/vnd.github+json"
+  req["Authorization"] = "Bearer #{token}" if token
+  res = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |h| h.request(req) }
+  raise "GitHub #{res.code} for #{path}" unless res.is_a?(Net::HTTPSuccess)
+
+  Base64.decode64(JSON.parse(res.body)["content"])
+end
+
+# ---------------------------------------------------------------------------
+# Source parsers
+# ---------------------------------------------------------------------------
+
+def parse_command_names(bin_src)
+  # Extract every 'when "cmd"' entry from bin/browserctl's case block.
+  # Normalise underscore variants (older releases) to hyphens.
+  bin_src.scan(/when\s+"([\w-]+)"/).flatten.uniq.map { |n| n.tr("_", "-") }
+end
+
+# Returns array of { long:, short:, takes_value:, desc:, choices: }
+def parse_opts(source)
+  source.scan(/^\s*opt\s+:(\w+)(?:,\s*"([^"]*)")?([^\n]*)/).map do |name, desc, rest|
+    long       = "--#{name.tr("_", "-")}"
+    short      = rest[/short:\s*"(-\w)"/, 1]
+    boolean    = (rest.match?(/default:\s*(?:true|false)/) || rest.match?(/type:\s*:flag/)) &&
+                 !rest.match?(/type:\s*:(?!flag)\w/)
+    choices    = parse_choices(desc.to_s)
+    { long: long, short: short, takes_value: !boolean, desc: desc.to_s, choices: choices }
+  end
+end
+
+def parse_choices(desc)
+  # "Output format: ai or html" → ["ai", "html"]
+  m = desc.match(/:\s*(\w+(?:\s+or\s+\w+)+)\b/i)
+  m ? m[1].split(/\s+or\s+/i) : nil
+end
+
+# ---------------------------------------------------------------------------
+# Build command data
+# ---------------------------------------------------------------------------
+
+def build_commands(ref)
+  puts "  Fetching bin/browserctl..."
+  bin_src   = github_fetch("bin/browserctl", ref)
+  cmd_names = parse_command_names(bin_src)
+  puts "  Found commands: #{cmd_names.join(", ")}"
+
+  commands = cmd_names.map do |name|
+    flags = case name
+            when "run"
+              [{ long: "--params", short: nil, takes_value: true, desc: "Parameters file", choices: nil }]
+            when "record", *INLINE_CMDS
+              []
+            else
+              fetch_flags(name, ref)
+            end
+    { name: name, desc: DESCS[name] || name, flags: flags }
+  end
+
+  # Record stop flags — parsed separately since record has subcommands
+  record_stop_flags = begin
+    puts "  Fetching commands/record.rb..."
+    src = github_fetch("lib/browserctl/commands/record.rb", ref)
+    parse_opts(src)
+  rescue RuntimeError => e
+    warn "  Warning: #{e.message}"
+    []
+  end
+
+  { commands: commands, record_stop_flags: record_stop_flags }
+end
+
+def fetch_flags(name, ref)
+  file = FILE_ALIASES[name] || name.tr("-", "_")
+  puts "  Fetching commands/#{file}.rb..."
+  src = github_fetch("lib/browserctl/commands/#{file}.rb", ref)
+  parse_opts(src)
+rescue RuntimeError => e
+  warn "  Warning: #{e.message}"
+  []
+end
+
+# ---------------------------------------------------------------------------
+# Zsh completion generator
+# ---------------------------------------------------------------------------
+
+# Returns a single zsh _arguments spec token for one flag
+def zsh_flag_spec(flag)
+  desc = flag[:desc].gsub(":", "\\:")
+  arg  = if flag[:choices]
+           ":#{flag[:long].delete_prefix("--")}:(#{flag[:choices].join(" ")})"
+         elsif FILE_FLAGS.include?(flag[:long])
+           ":file:_files"
+         elsif flag[:takes_value]
+           ":#{flag[:long].delete_prefix("--")}:"
+         else
+           ""
+         end
+  eq = flag[:takes_value] ? "=" : ""
+  if flag[:short]
+    "'(#{flag[:short]} #{flag[:long]})'{#{flag[:short]},#{flag[:long]}}'#{eq}[#{desc}]#{arg}'"
+  else
+    "'#{flag[:long]}#{eq}[#{desc}]#{arg}'"
+  end
+end
+
+def zsh_arguments_block(specs, indent)
+  pad = " " * indent
+  first = "#{pad}_arguments \\"
+  rest  = specs.map { |s| "#{pad}  #{s}" }.join(" \\\n")
+  "#{first}\n#{rest}"
+end
+
+def generate_zsh(commands, record_stop_flags) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  out = []
+
+  out << "#compdef browserctl"
+  out << ""
+  out << "_browserctl_cmds=("
+  commands.each { |c| out << "  '#{c[:name]}:#{c[:desc]}'" }
+  out << ")"
+  out << ""
+  out << "_browserctl_record_cmds=("
+  out << "  'start:Start recording browser commands'"
+  out << "  'stop:Stop recording and save workflow'"
+  out << "  'status:Show active recording name'"
+  out << ")"
+  out << ""
+  out << "_browserctl() {"
+  out << "  local context state state_descr line"
+  out << "  typeset -A opt_args"
+  out << ""
+  out << "  _arguments -C \\"
+  out << "    '(--version -v)'{--version,-v}'[Print version and exit]' \\"
+  out << "    '(--help -h)'{--help,-h}'[Show help]' \\"
+  out << "    '--daemon=[Connect to named daemon instance]:daemon name:' \\"
+  out << "    '1: :->command' \\"
+  out << "    '*:: :->args'"
+  out << ""
+  out << "  case $state in"
+  out << "    command)"
+  out << "      _describe -t commands 'browserctl command' _browserctl_cmds"
+  out << "      ;;"
+  out << "    args)"
+  out << "      case $line[1] in"
+
+  commands.each do |cmd| # rubocop:disable Metrics/BlockLength
+    case cmd[:name]
+    when "record"
+      out << "        record)"
+      out << "          _arguments -C \\"
+      out << "            '1: :->subcmd' \\"
+      out << "            '*:: :->subargs'"
+      out << "          case $state in"
+      out << "            subcmd)"
+      out << "              _describe -t subcommands 'record subcommand' _browserctl_record_cmds"
+      out << "              ;;"
+      if record_stop_flags.any?
+        out << "            subargs)"
+        out << "              case $line[1] in"
+        out << "                stop)"
+        specs = record_stop_flags.map { |f| zsh_flag_spec(f) }
+        out << zsh_arguments_block(specs, 18)
+        out << "                  ;;"
+        out << "              esac"
+        out << "              ;;"
+      end
+      out << "          esac"
+    when "set-cookie"
+      out << "        set-cookie)"
+      out << "          _arguments \\"
+      out << "            '1:page name:' \\"
+      out << "            '2:cookie name:' \\"
+      out << "            '3:cookie value:' \\"
+      out << "            '4:domain:'"
+    when "export-cookies", "import-cookies"
+      out << "        #{cmd[:name]})"
+      out << "          _arguments \\"
+      out << "            '1:page name:' \\"
+      out << "            '2:file path:_files'"
+    when "describe"
+      out << "        describe)"
+      out << "          _arguments '1:workflow name:'"
+    else
+      next if cmd[:flags].empty?
+
+      extra = case cmd[:name]
+              when "watch" then ["'1:page name:'", "'2:CSS selector:'"]
+              when "run"   then ["'1:workflow name or file:_files'"]
+              else              ["'1:page name:'"]
+              end
+      specs = cmd[:flags].map { |f| zsh_flag_spec(f) } + extra
+      out << "        #{cmd[:name]})"
+      out << zsh_arguments_block(specs, 10)
+    end
+    out << "          ;;"
+  end
+
+  # Catch-all for commands that take only a page name (no flags, no special handling)
+  basic = commands.select do |c|
+    c[:flags].empty? &&
+      !%w[record set-cookie export-cookies import-cookies describe].include?(c[:name])
+  end
+  unless basic.empty?
+    out << "        #{basic.map { |c| c[:name] }.join("|")})"
+    out << "          _arguments '1:page name:'"
+    out << "          ;;"
+  end
+
+  out << "      esac"
+  out << "      ;;"
+  out << "  esac"
+  out << "}"
+  out << ""
+  out << "_browserctl \"$@\""
+  out << ""
+
+  out.join("\n")
+end
+
+# ---------------------------------------------------------------------------
+# Bash completion generator
+# ---------------------------------------------------------------------------
+
+def generate_bash(commands, record_stop_flags) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  all_cmds = commands.map { |c| c[:name] }.join(" ")
+  out = []
+
+  out << "_browserctl() {"
+  out << "  local cur prev words cword"
+  out << "  _init_completion || return"
+  out << ""
+  out << "  local all_cmds=\"#{all_cmds}\""
+  out << ""
+  out << "  # Find the real command, skipping --daemon <name> if present"
+  out << "  local cmd=\"\" cmd_idx=1"
+  out << "  local i=1"
+  out << "  while [[ $i -lt ${#words[@]} ]]; do"
+  out << "    case \"${words[$i]}\" in"
+  out << "      --daemon)"
+  out << "        (( i += 2 ))"
+  out << "        (( cmd_idx += 2 ))"
+  out << "        ;;"
+  out << "      --version|-v|--help|-h)"
+  out << "        (( i++ ))"
+  out << "        ;;"
+  out << "      --*)"
+  out << "        (( i++ ))"
+  out << "        ;;"
+  out << "      *)"
+  out << "        cmd=\"${words[$i]}\""
+  out << "        cmd_idx=$i"
+  out << "        break"
+  out << "        ;;"
+  out << "    esac"
+  out << "  done"
+  out << ""
+  out << "  if [[ $cword -le $cmd_idx ]]; then"
+  out << "    COMPREPLY=($(compgen -W \"$all_cmds --daemon --version --help\" -- \"$cur\"))"
+  out << "    return"
+  out << "  fi"
+  out << ""
+  out << "  case $cmd in"
+
+  commands.each do |cmd| # rubocop:disable Metrics/BlockLength
+    next if cmd[:flags].empty? && cmd[:name] != "record"
+
+    out << "    #{cmd[:name]})"
+
+    if cmd[:name] == "record"
+      out << "      local subcmd=\"${words[$((cmd_idx + 1))]}\""
+      out << "      if [[ $cword -eq $((cmd_idx + 1)) ]]; then"
+      out << "        COMPREPLY=($(compgen -W \"start stop status\" -- \"$cur\"))"
+      if record_stop_flags.any?
+        out << "      elif [[ $subcmd == \"stop\" && $cur == -* ]]; then"
+        out << "        case $prev in"
+        record_stop_flags.each do |f|
+          keys = [f[:long], f[:short]].compact.join("|")
+          val  = FILE_FLAGS.include?(f[:long]) ? "COMPREPLY=($(compgen -f -- \"$cur\")); return ;;" : "return ;;"
+          out << "          #{keys}) #{val}"
+        end
+        out << "        esac"
+        out << "        COMPREPLY=($(compgen -W \"#{record_stop_flags.map { |f| f[:long] }.join(" ")}\" -- \"$cur\"))"
+      end
+      out << "      fi"
+      out << "      ;;"
+      next
+    end
+
+    next if cmd[:flags].empty?
+
+    value_flags = cmd[:flags].select { |f| f[:takes_value] || f[:choices] }
+    if value_flags.any?
+      out << "      case $prev in"
+      value_flags.each do |f|
+        keys = [f[:long], f[:short]].compact.join("|")
+        val  = if f[:choices]
+                 "COMPREPLY=($(compgen -W \"#{f[:choices].join(" ")}\" -- \"$cur\")); return ;;"
+               elsif FILE_FLAGS.include?(f[:long])
+                 "COMPREPLY=($(compgen -f -- \"$cur\")); return ;;"
+               else
+                 "return ;;"
+               end
+        out << "        #{keys}) #{val}"
+      end
+      out << "      esac"
+    end
+
+    flag_list = cmd[:flags].map { |f| f[:long] }.join(" ")
+    if cmd[:name] == "run"
+      out << "      if [[ $cur == -* ]]; then"
+      out << "        COMPREPLY=($(compgen -W \"#{flag_list}\" -- \"$cur\"))"
+      out << "      else"
+      out << "        COMPREPLY=($(compgen -f -- \"$cur\"))"
+      out << "      fi"
+    else
+      out << "      [[ $cur == -* ]] && COMPREPLY=($(compgen -W \"#{flag_list}\" -- \"$cur\"))"
+    end
+    out << "      ;;"
+  end
+
+  out << "  esac"
+  out << "}"
+  out << ""
+  out << "complete -F _browserctl browserctl"
+  out << ""
+
+  out.join("\n")
+end
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def resolve_version(arg)
+  return arg if arg
+
+  formula = File.read(File.join(TAP_ROOT, "Formula/browserctl.rb"))
+  m = formula.match(%r{archive/refs/tags/v(\d+\.\d+\.\d+)})
+  raise "Could not detect version from Formula/browserctl.rb" unless m
+
+  m[1]
+end
+
+ref = resolve_version(ARGV[0])
+puts "Generating completions for browserctl v#{ref}..."
+
+data            = build_commands(ref)
+commands        = data[:commands]
+record_stop     = data[:record_stop_flags]
+
+zsh_src  = generate_zsh(commands, record_stop)
+bash_src = generate_bash(commands, record_stop)
+
+FileUtils.mkdir_p(OUT_DIR)
+File.write(File.join(OUT_DIR, "_browserctl"),      zsh_src)
+File.write(File.join(OUT_DIR, "browserctl.bash"),  bash_src)
+
+puts "Written:"
+puts "  #{OUT_DIR}/_browserctl"
+puts "  #{OUT_DIR}/browserctl.bash"

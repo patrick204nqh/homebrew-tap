@@ -126,9 +126,15 @@ jobs:
 
             ruby .github/scripts/update-formula.rb "Formula/${name}.rb" "$latest" "$sha256"
             echo "Updated $name: $current → $latest"
+
+            if [ -x "script/gen-completions" ] && \
+               { [ -f "completions/${name}.bash" ] || [ -f "completions/_${name}" ]; }; then
+              echo "Regenerating completions for $name..."
+              ruby script/gen-completions "$latest" || true
+            fi
           done < <(echo "$UPDATES" | jq -c '.[]')
 
-          git add Formula/
+          git add Formula/ completions/
           if git diff --cached --quiet; then
             echo "No formula changes to commit."
             exit 0

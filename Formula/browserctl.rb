@@ -116,6 +116,9 @@ class Browserctl < Formula
     }
     (bin / "browserctl").write_env_script(libexec / "bin/browserctl", env)
     (bin / "browserd").write_env_script(libexec / "bin/browserd", env)
+
+    bash_completion.install tap.path / "completions/browserctl.bash"
+    zsh_completion.install tap.path / "completions/_browserctl"
   end
 
   def post_install
