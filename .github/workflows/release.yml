@@ -2,8 +2,9 @@ name: Release
 
 # ─── PURPOSE ────────────────────────────────────────────────────────────────
 # Triggered when a PR merges into main and touches Formula/*.
-# Publishes the prerelease bottle that was built and verified during PR CI.
-# No bottle is built here — the heavy work is already done.
+# Publishes the prerelease bottle that was built and verified during PR CI,
+# rewrites its description, and prunes stale tap-pr-* releases whose bottles
+# are no longer referenced by any formula.
 # ────────────────────────────────────────────────────────────────────────────
 on:
   push:
@@ -47,13 +48,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Publish prerelease
+      - name: Publish and describe release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORMULA: ${{ matrix.formula }}
         run: |
           set -euo pipefail
-          # Derive the snapshot tag from the bottle block root_url written by CI.
+
           tag=$(grep -oP 'root_url.*releases/download/\K[^"]+' \
             "Formula/${FORMULA}.rb" 2>/dev/null | head -1 || true)
 
@@ -67,10 +68,57 @@ jobs:
             exit 0
           fi
 
+          # Extract version
+          version=$(grep -oP '^\s+version\s+"\K[^"]+' "Formula/${FORMULA}.rb" | head -1)
+          if [ -z "$version" ]; then
+            version=$(grep -oP '(?:archive/refs/tags/v|releases/download/v)\K[0-9]+\.[0-9]+\.[0-9]+' \
+              "Formula/${FORMULA}.rb" | head -1)
+          fi
+
+          # Extract PR number from tag (tap-pr-N)
+          pr_number=$(echo "$tag" | grep -oP '(?<=tap-pr-)\d+' || true)
+
+          # Compose release body
+          if [ -n "$pr_number" ]; then
+            pr_ref="merged via [PR #${pr_number}](https://github.com/${GITHUB_REPOSITORY}/pull/${pr_number})"
+          else
+            pr_ref="deployed to \`main\`"
+          fi
+
+          body="Bottles for \`${FORMULA}\` v${version} — built and verified by CI, ${pr_ref}."
+
           is_prerelease=$(gh release view "$tag" --json isPrerelease -q '.isPrerelease')
           if [ "$is_prerelease" = "true" ]; then
-            gh release edit "$tag" --prerelease=false
-            echo "Published $tag"
+            gh release edit "$tag" \
+              --prerelease=false \
+              --title "${FORMULA} v${version}" \
+              --notes "$body"
+            echo "Published $tag as '${FORMULA} v${version}'"
           else
-            echo "$tag is already published — nothing to do."
+            echo "$tag is already published — refreshing description."
+            gh release edit "$tag" \
+              --title "${FORMULA} v${version}" \
+              --notes "$body"
           fi
+
+      - name: Prune stale tap-pr releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Collect every tap-pr tag currently referenced by a formula
+          referenced=$(grep -rhoP 'root_url.*releases/download/\K[^"]+' Formula/ \
+            | grep '^tap-pr-' | sort -u)
+
+          # Delete published tap-pr-* releases no longer referenced by any formula
+          gh release list --limit 100 --json tagName,isPrerelease \
+            -q '.[] | select(.tagName | test("^tap-pr-")) | select(.isPrerelease == false) | .tagName' \
+          | while read -r stale_tag; do
+              if echo "$referenced" | grep -qx "$stale_tag"; then
+                echo "$stale_tag still referenced — keeping."
+              else
+                gh release delete "$stale_tag" --yes --cleanup-tag
+                echo "Deleted stale release: $stale_tag"
+              fi
+            done
