@@ -146,7 +146,7 @@ jobs:
             '.[] | select(.current != .latest) | "- `\(.name)`: \(.current) → \(.latest)"')
 
           git commit -m "chore: sync formula versions"
-          git push --force-with-lease origin "$branch"
+          git push --force origin "$branch"
 
           existing=$(gh pr list --head "$branch" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
