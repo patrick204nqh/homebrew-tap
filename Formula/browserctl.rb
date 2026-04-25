@@ -3,14 +3,9 @@
 class Browserctl < Formula
   desc "Persistent browser automation daemon and CLI for AI agents"
   homepage "https://github.com/patrick204nqh/browserctl"
-  url "https://github.com/patrick204nqh/browserctl/archive/refs/tags/v0.4.0.tar.gz"
-  sha256 "a8f977dccdd22d419fa11adebeeddd0b9b82e71be1a110e2df9df3251f5a34c3"
+  url "https://github.com/patrick204nqh/browserctl/archive/refs/tags/v0.5.0.tar.gz"
+  sha256 "25664431f4c81ffb56280ab33ab27f57a0bce39b999892e3e6d7b8a5fd5e5d18"
   license "MIT"
-
-  bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-39"
-    sha256 cellar: :any, arm64_sequoia: "e2329caad8fe39d8dd0e32b261d5024195774dd1ef736ac28e0d4d4bcea166e5"
-  end
 
   depends_on "gmp"
 
