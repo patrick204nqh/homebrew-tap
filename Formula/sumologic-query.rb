@@ -28,13 +28,13 @@ class SumologicQuery < Formula
   end
 
   resource "thor" do
-    url "https://rubygems.org/downloads/thor-1.3.2.gem"
-    sha256 "eef0293b9e24158ccad7ab383ae83534b7ad4ed99c09f96f1a6b036550abbeda"
+    url "https://rubygems.org/downloads/thor-1.5.0.gem"
+    sha256 "e3a9e55fe857e44859ce104a84675ab6e8cd59c650a49106a05f55f136425e73"
   end
 
   resource "base64" do
-    url "https://rubygems.org/downloads/base64-0.2.0.gem"
-    sha256 "0f25e9b21a02a0cc0cea8ef92b2041035d39350946e8789c562b2d1a3da01507"
+    url "https://rubygems.org/downloads/base64-0.3.0.gem"
+    sha256 "27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b"
   end
 
   def install
