@@ -69,7 +69,7 @@ jobs:
           fi
 
           # Extract version
-          version=$(grep -oP '^\s+version\s+"\K[^"]+' "Formula/${FORMULA}.rb" | head -1)
+          version=$(grep -oP '^\s+version\s+"\K[^"]+' "Formula/${FORMULA}.rb" | head -1 || true)
           if [ -z "$version" ]; then
             version=$(grep -oP '(?:archive/refs/tags/v|releases/download/v)\K[0-9]+\.[0-9]+\.[0-9]+' \
               "Formula/${FORMULA}.rb" | head -1)
