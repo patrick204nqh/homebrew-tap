@@ -28,8 +28,8 @@ patch = <<~RUBY
 
   # --- runtime relocation patch (added by patch-rbconfig.rb) ---
   _reloc_prefix = File.expand_path("../../../..", __dir__)
-  RbConfig::CONFIG.each_value          { |v| v.gsub!(#{build_prefix.inspect}, _reloc_prefix) rescue nil }
-  RbConfig::MAKEFILE_CONFIG.each_value { |v| v.gsub!(#{build_prefix.inspect}, _reloc_prefix) rescue nil }
+  RbConfig::CONFIG.each_value          { |v| v.gsub!(#{build_prefix.inspect}, _reloc_prefix) rescue FrozenError }
+  RbConfig::MAKEFILE_CONFIG.each_value { |v| v.gsub!(#{build_prefix.inspect}, _reloc_prefix) rescue FrozenError }
   # --- end patch ---
 RUBY
 

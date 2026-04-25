@@ -116,6 +116,28 @@ rationale behind arm64-only bottles.
 - Order formula sections: `desc`, `homepage`, `url`, `sha256`, `license`, `RUBY_RUNTIME_VERSION` constant, dependencies, resources, `def install`, `def post_install` (if needed), `def caveats`, `test`, private helpers.
 - Do not commit anything to `bottles/` — it is git-ignored. Bottles live in GitHub Releases.
 
+## Scripts
+
+Scripts live in two directories with distinct purposes:
+
+| Directory | Purpose | When to run |
+|-----------|---------|-------------|
+| `script/` | Developer tools and runtime utilities — safe to invoke locally | Anytime |
+| `.github/scripts/` | CI automation — called exclusively from workflow `run:` steps | CI only |
+
+**`script/` scripts:**
+- `script/new-formula` — scaffolds a new Ruby-based formula
+- `script/gen-completions` — regenerates shell completion files from upstream source
+- `script/relocate-runtime.rb` — fixes dylib paths and shebangs after the ruby-runtime is staged; also bundled into the runtime tarball by `build-ruby-runtime.yml`
+
+**`.github/scripts/` scripts:**
+- `patch-rbconfig.rb` — appends a runtime-relocation patch to `rbconfig.rb` during the runtime build
+- `update-formula.rb` — bumps formula version and SHA256 (called by `sync-formulas.yml`)
+- `update-runtime-sha.rb` — updates the `ruby-runtime` SHA256 across all formulas (called by `build-ruby-runtime.yml`)
+- `sync-gems.rb` — checks RubyGems.org for newer gem versions (called by `sync-gems.yml`)
+
+If a script is useful to run locally, put it in `script/`. If it is only ever invoked from a workflow `run:` step, put it in `.github/scripts/`.
+
 ## Local dev setup
 
 ```bash

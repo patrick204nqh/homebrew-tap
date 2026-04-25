@@ -85,7 +85,7 @@ jobs:
           done
 
           # 4. Bundle the relocation script so formulas need no inline logic
-          cp .github/scripts/relocate-runtime.rb "$INSTALL_DIR/relocate-runtime.rb"
+          cp script/relocate-runtime.rb "$INSTALL_DIR/relocate-runtime.rb"
           chmod +x "$INSTALL_DIR/relocate-runtime.rb"
 
       - name: Strip and archive
