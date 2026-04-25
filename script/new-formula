@@ -38,7 +38,7 @@ bin_name = bin_idx ? ARGV[bin_idx + 1] : name
 abort "ERROR: name must be kebab-case (letters, numbers, hyphens only)" \
   unless name.match?(/\A[a-z0-9][a-z0-9-]*\z/)
 abort "ERROR: repo must be owner/repo format" \
-  unless repo.match?(/\A[^\/]+\/[^\/]+\z/)
+  unless repo.match?(%r{\A[^/]+/[^/]+\z})
 abort "ERROR: --bin requires a value" if bin_name.nil?
 
 class_name = name.split("-").map(&:capitalize).join
@@ -50,7 +50,7 @@ abort "ERROR: #{target} already exists — edit it directly" if File.exist?(targ
 # stays in sync without requiring a manual lookup.
 runtime_version = nil
 runtime_sha     = nil
-Dir["Formula/*.rb"].sort.each do |f|
+Dir["Formula/*.rb"].each do |f|
   src = File.read(f)
   v = src.match(/RUBY_RUNTIME_VERSION\s*=\s*"([^"]+)"/)&.captures&.first
   s = src.match(/resource\s+"ruby-runtime"\s+do\n.*?sha256\s+"([a-f0-9]{64})"/m)&.captures&.first
