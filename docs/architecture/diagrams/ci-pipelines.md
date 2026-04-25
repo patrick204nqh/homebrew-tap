@@ -78,7 +78,60 @@ flowchart TD
 
 ---
 
-## 4. Build Ruby Runtime — Manual (`build-ruby-runtime.yml`)
+## 4. Sync Gems — Weekly (`sync-gems.yml`)
+
+```mermaid
+flowchart TD
+    T([cron Sun 22:00 UTC / workflow_dispatch])
+
+    CHECK[Check Gem Versions\nquery RubyGems API for each resource block\nvs current pinned versions]
+    UPDATE[Update Formulas\ndownload new gems · compute sha256\nwrite updated resource blocks]
+    OPEN_PR[Open Update PR\nopen PR on sync/gem-updates-YYYY-MM-DD]
+    SKIP([skip — all gems up to date])
+
+    T --> CHECK
+    CHECK -->|updates found| UPDATE --> OPEN_PR
+    CHECK -->|nothing to update| SKIP
+
+    OPEN_PR -.->|CI runs automatically| CI[validate.yml + bottle.yml\nlint · audit · build + verify bottles]
+    CI -.->|PR merged| RELEASE[release.yml\npublish bottles]
+
+    style CHECK    fill:#dbeafe,stroke:#93c5fd
+    style UPDATE   fill:#dcfce7,stroke:#86efac
+    style OPEN_PR  fill:#fef9c3,stroke:#fde047
+    style SKIP     fill:#f3f4f6,stroke:#d1d5db
+    style CI       fill:#dcfce7,stroke:#86efac
+    style RELEASE  fill:#dcfce7,stroke:#86efac
+```
+
+---
+
+## 5. Sync Ruby Runtime — Weekly (`sync-ruby-runtime.yml`)
+
+```mermaid
+flowchart TD
+    T([cron Sun 21:00 UTC / workflow_dispatch])
+
+    READ[Read Current Version\nRUBY_RUNTIME_VERSION from formulas]
+    QUERY[Query ruby-build\nlist X.Y.x definitions on GitHub]
+    TRIGGER[Trigger build-ruby-runtime.yml\ngh workflow run -f ruby_version=X.Y.Z]
+    SKIP([skip — runtime up to date\nor release already exists])
+
+    T --> READ --> QUERY
+    QUERY -->|newer patch found\nno release yet| TRIGGER
+    QUERY -->|up to date| SKIP
+    TRIGGER -.->|builds runtime + opens PR| BUILD[build-ruby-runtime.yml]
+
+    style READ     fill:#dbeafe,stroke:#93c5fd
+    style QUERY    fill:#dbeafe,stroke:#93c5fd
+    style TRIGGER  fill:#fef9c3,stroke:#fde047
+    style SKIP     fill:#f3f4f6,stroke:#d1d5db
+    style BUILD    fill:#dcfce7,stroke:#86efac
+```
+
+---
+
+## 6. Build Ruby Runtime — Manual / Auto (`build-ruby-runtime.yml`)
 
 ```mermaid
 flowchart TD

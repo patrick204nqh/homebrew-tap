@@ -1,0 +1,57 @@
+name: Sync Gems
+
+# Checks all bundled gem resource blocks for newer versions on RubyGems.org
+# and opens a PR with any updates found. Runs weekly, 1 h before sync-formulas
+# so gem and formula syncs land as separate PRs on the same day.
+on:
+  schedule:
+    - cron: '0 22 * * 0'  # Sunday 22:00 UTC
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: Sync Gem Versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler: none
+
+      - name: Check and update gem versions
+        run: ruby .github/scripts/sync-gems.rb Formula/*.rb
+
+      - name: Open or update PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet; then
+            echo "All gems up to date — no PR needed."
+            exit 0
+          fi
+
+          branch="sync/gem-updates-$(date -u +%Y-%m-%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git checkout -B "$branch"
+          git add Formula/
+          git commit -m "chore: sync bundled gem versions"
+          git push --force-with-lease origin "$branch"
+
+          existing=$(gh pr list --head "$branch" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "PR #${existing} already open — branch updated."
+          else
+            gh pr create \
+              --title "chore: sync bundled gem versions $(date -u +%Y-%m-%d)" \
+              --body-file sync_gems_summary.md \
+              --base main \
+              --head "$branch"
+          fi

@@ -1,0 +1,83 @@
+name: Sync Ruby Runtime
+
+# Checks whether a newer patch release of the bundled Ruby runtime is
+# available in ruby-build. If one is found and not yet published as a release,
+# triggers build-ruby-runtime.yml automatically.
+#
+# Runs 2 h before sync-formulas so runtime, gem, and formula syncs land
+# as separate PRs on the same day without racing each other.
+on:
+  schedule:
+    - cron: '0 21 * * 0'  # Sunday 21:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Check Ruby Runtime Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write   # needed to trigger build-ruby-runtime.yml
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read current runtime version
+        id: current
+        run: |
+          # -h suppresses the "Formula/name.rb:" prefix grep adds with multiple files.
+          version=$(grep -hoP 'RUBY_RUNTIME_VERSION = "\K[^"]+' Formula/*.rb | head -1)
+          if [ -z "$version" ]; then
+            echo "RUBY_RUNTIME_VERSION not found in Formula/*.rb — skipping."
+            exit 0
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Current: $version"
+
+      - name: Find latest patch in same series
+        id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT: ${{ steps.current.outputs.version }}
+        run: |
+          minor=$(echo "$CURRENT" | cut -d. -f1,2)
+          escaped=$(echo "$minor" | sed 's/\./\\./g')
+
+          latest=$(curl -sf -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/rbenv/ruby-build/contents/share/ruby-build" \
+            | jq -r '.[].name' \
+            | grep -E "^${escaped}\.[0-9]+$" \
+            | sort -V \
+            | tail -1)
+
+          if [ -z "$latest" ]; then
+            echo "Could not determine latest Ruby version for ${minor}.x — skipping."
+            echo "latest=" >> "$GITHUB_OUTPUT"
+          else
+            echo "latest=$latest" >> "$GITHUB_OUTPUT"
+            echo "Latest: $latest"
+          fi
+
+      - name: Trigger runtime build if newer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT: ${{ steps.current.outputs.version }}
+          LATEST: ${{ steps.latest.outputs.latest }}
+        run: |
+          if [ -z "$LATEST" ] || [ "$CURRENT" = "$LATEST" ]; then
+            echo "Ruby runtime up to date: $CURRENT"
+            exit 0
+          fi
+
+          # Skip if the runtime for this version is already published —
+          # a previous run may have triggered a build that hasn't merged yet.
+          if gh release view "ruby-runtime-$LATEST" &>/dev/null; then
+            echo "Release ruby-runtime-$LATEST already exists — skipping."
+            exit 0
+          fi
+
+          echo "New Ruby available: $CURRENT → $LATEST"
+          gh workflow run build-ruby-runtime.yml \
+            -f ruby_version="$LATEST" \
+            --ref main
+          echo "Triggered build-ruby-runtime.yml for $LATEST"

@@ -15,6 +15,9 @@ Thumbs.db
 # Dev dependencies
 Gemfile.lock
 
+# CI-generated PR body for sync-gems workflow — not committed
+sync_gems_summary.md
+
 # Build artifacts
 tarball.tar.gz
 *.bottle*.tar.gz
