@@ -20,7 +20,7 @@ class Browserctl < Formula
   #
   # To update: run the build-ruby-runtime workflow for the desired version, then
   # replace the sha256 values below with the ones printed in the workflow summary.
-  RUBY_RUNTIME_VERSION = "3.3.6"
+  RUBY_RUNTIME_VERSION = "3.3.11"
 
   resource "ruby-runtime" do
     url "https://github.com/patrick204nqh/homebrew-tap/releases/download/" \
@@ -156,6 +156,16 @@ class Browserctl < Formula
 
       Stop the daemon:
         browserctl shutdown
+
+      If you use asdf and previously installed browserctl via RubyGems, asdf
+      shims for browserd/browserctl may shadow this Homebrew installation.
+      Fix it by removing the gem from your asdf-managed Ruby:
+        gem uninstall browserctl
+        asdf reshim ruby
+
+      Alternatively, ensure Homebrew's bin appears before asdf shims in PATH
+      (add this before your asdf init line in ~/.zshrc or ~/.bashrc):
+        eval "$(/opt/homebrew/bin/brew shellenv)"
     EOS
   end
 

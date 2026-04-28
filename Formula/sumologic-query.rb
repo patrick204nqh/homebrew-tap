@@ -18,7 +18,7 @@ class SumologicQuery < Formula
   # Shared relocatable Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
   # Run that workflow once per Ruby version bump; all Ruby-based tap formulas share this release.
   # See docs/architecture/diagrams/04-build-ruby-runtime-manual.png for the full picture.
-  RUBY_RUNTIME_VERSION = "3.3.6"
+  RUBY_RUNTIME_VERSION = "3.3.11"
 
   resource "ruby-runtime" do
     url "https://github.com/patrick204nqh/homebrew-tap/releases/download/" \

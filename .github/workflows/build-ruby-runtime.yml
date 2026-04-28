@@ -142,7 +142,7 @@ jobs:
 
           git checkout -B "$BRANCH"
 
-          ruby .github/scripts/update-runtime-sha.rb "$SHA" Formula/*.rb
+          ruby .github/scripts/update-runtime-sha.rb "$SHA" "$RUBY_VERSION" Formula/*.rb
 
           git add Formula/
           if git diff --cached --quiet; then
@@ -150,7 +150,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "fix: update ruby-runtime sha256 for ${RUBY_VERSION}"
+          git commit -m "fix: bump ruby-runtime to ${RUBY_VERSION}"
           git push --force-with-lease origin "$BRANCH"
 
           existing=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
@@ -158,8 +158,8 @@ jobs:
             echo "PR #${existing} already open — branch updated."
           else
             gh pr create \
-              --title "fix: update ruby-runtime sha256 for ${RUBY_VERSION}" \
-              --body "$(printf 'Automated update from [build-ruby-runtime run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).\n\n```\nsha256 \"%s\"\n```' "$SHA")" \
+              --title "fix: bump ruby-runtime to ${RUBY_VERSION}" \
+              --body "$(printf 'Automated update from [build-ruby-runtime run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).\n\nBumps `RUBY_RUNTIME_VERSION` to `%s` and updates `sha256`.\n\n```\nsha256 \"%s\"\n```' "$RUBY_VERSION" "$SHA")" \
               --base main \
               --head "$BRANCH"
           fi
