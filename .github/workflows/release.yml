@@ -91,13 +91,13 @@ jobs:
           if [ "$is_prerelease" = "true" ]; then
             gh release edit "$tag" \
               --prerelease=false \
-              --title "${FORMULA} v${version}" \
+              --title "$tag" \
               --notes "$body"
-            echo "Published $tag as '${FORMULA} v${version}'"
+            echo "Published $tag"
           else
             echo "$tag is already published — refreshing description."
             gh release edit "$tag" \
-              --title "${FORMULA} v${version}" \
+              --title "$tag" \
               --notes "$body"
           fi
 
