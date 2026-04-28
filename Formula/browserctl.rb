@@ -147,15 +147,16 @@ class Browserctl < Formula
       browserctl requires Google Chrome or Chromium to be installed.
 
       Start the browser daemon:
-        browserd
+        browserd &
 
-      Then control the browser:
-        browserctl goto https://example.com
-        browserctl snap
-        browserctl screenshot
+      Open a page and interact:
+        browserctl page open main --url https://example.com
+        browserctl snapshot main
+        browserctl fill main --ref e1 --value "hello"
+        browserctl click main --ref e2
 
       Stop the daemon:
-        browserctl shutdown
+        browserctl daemon stop
 
       If you use asdf and previously installed browserctl via RubyGems, asdf
       shims for browserd/browserctl may shadow this Homebrew installation.
