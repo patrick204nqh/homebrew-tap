@@ -8,8 +8,9 @@ class Browserctl < Formula
   license "MIT"
 
   bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-45"
-    sha256 cellar: :any, arm64_sequoia: "202b61dcea8c472a29d3fbb902f390acf64c7f88f34acd51cf6f88e969c1d329"
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-46"
+    rebuild 1
+    sha256 cellar: :any, arm64_sequoia: "120dd017c6a98de1004036cd7ccea1d453b85087ee9f878c0964245e05e8e69c"
   end
 
   depends_on "gmp"
