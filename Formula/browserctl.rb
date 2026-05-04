@@ -8,8 +8,9 @@ class Browserctl < Formula
   license "MIT"
 
   bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-45"
-    sha256 cellar: :any, arm64_sequoia: "202b61dcea8c472a29d3fbb902f390acf64c7f88f34acd51cf6f88e969c1d329"
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-46"
+    rebuild 1
+    sha256 cellar: :any, arm64_sequoia: "120dd017c6a98de1004036cd7ccea1d453b85087ee9f878c0964245e05e8e69c"
   end
 
   depends_on "gmp"
@@ -31,8 +32,8 @@ class Browserctl < Formula
 
   # nokogiri — precompiled arm64 platform gem (avoids needing libxml2/libxslt)
   resource "nokogiri" do
-    url "https://rubygems.org/downloads/nokogiri-1.19.2-arm64-darwin.gem"
-    sha256 "58d8ea2e31a967b843b70487a44c14c8ba1866daa1b9da9be9dbdf1b43dee205"
+    url "https://rubygems.org/downloads/nokogiri-1.19.3-arm64-darwin.gem"
+    sha256 "71b9bd424b1b7abc18b05052a1a3cfd3627abdca62be280854cc411791357e42"
   end
 
   # ferrum and its transitive deps
