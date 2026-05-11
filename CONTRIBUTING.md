@@ -26,6 +26,30 @@ already-verified prerelease. No bottle is built post-merge.
 
 See [CI pipeline diagrams](docs/architecture/diagrams/ci-pipelines.md) for visual flowcharts.
 
+## Release tags and retention
+
+Bottle releases use a per-formula tag scheme so each formula's release lifecycle
+is independent.
+
+- **Tag format:** `{formula}-v{version}` — e.g. `browserctl-v0.13.0`,
+  `sumologic-query-v1.4.2`. The tag is derived from the formula name and the
+  `version` line in the `.rb` file.
+- **One release per (formula, version) pair.** A release holds only that
+  formula's bottles. Same-version rebuilds reuse the existing tag and overwrite
+  assets in place (`gh release upload --clobber`).
+- **Retention:** on every merge to `main`, `release.yml` keeps the 5 most
+  recent published `{formula}-v*` releases per formula and deletes older ones
+  (tag + assets). Prereleases are not counted — they live until their PR
+  merges (becoming published) or closes unmerged (deleted by `cleanup.yml`).
+- **Retiring a formula intentionally** (rename, deletion, deprecation): delete
+  all of its `{formula}-v*` releases manually with
+  `gh release delete {formula}-v{version} --yes --cleanup-tag`. The retention
+  sweep is per-formula and will not auto-prune releases for a formula whose
+  `.rb` file no longer exists.
+
+Legacy `tap-pr-*` releases from the previous PR-coupled scheme are no longer
+created or referenced and can be deleted manually if any remain.
+
 ## Adding a new formula
 
 Use the generator to scaffold the formula with the correct ruby-runtime pattern:

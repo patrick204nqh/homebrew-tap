@@ -33,30 +33,28 @@ jobs:
           FORMULAS: ${{ steps.detect.outputs.formulas }}
         run: |
           set -euo pipefail
-          # Derive the snapshot tag from the bottle block root_url written by CI.
-          # All formulas in the PR share the same tap-pr-{N} tag, so we only
-          # need to find it once.
-          tag=""
+          # Each changed formula has its own `{formula}-v{version}` tag in its
+          # bottle block. Iterate so we clean up every per-formula prerelease
+          # this PR created (not just the first one we find).
           while IFS= read -r formula; do
             tag=$(grep -oP 'root_url.*releases/download/\K[^"]+' \
               "Formula/${formula}.rb" 2>/dev/null | head -1 || true)
-            [ -n "$tag" ] && break
+
+            if [ -z "$tag" ]; then
+              echo "${formula}: no bottle block — skipping."
+              continue
+            fi
+
+            if ! gh release view "$tag" &>/dev/null; then
+              echo "${tag}: no release found, skipping."
+              continue
+            fi
+
+            is_prerelease=$(gh release view "$tag" --json isPrerelease -q '.isPrerelease')
+            if [ "$is_prerelease" = "true" ]; then
+              gh release delete "$tag" --yes --cleanup-tag
+              echo "Deleted prerelease $tag"
+            else
+              echo "$tag is already published — keeping."
+            fi
           done < <(echo "$FORMULAS" | jq -r '.[]')
-
-          if [ -z "$tag" ]; then
-            echo "No bottle block found in changed formulas — nothing to clean up."
-            exit 0
-          fi
-
-          if ! gh release view "$tag" &>/dev/null; then
-            echo "$tag: no release found, skipping."
-            exit 0
-          fi
-
-          is_prerelease=$(gh release view "$tag" --json isPrerelease -q '.isPrerelease')
-          if [ "$is_prerelease" = "true" ]; then
-            gh release delete "$tag" --yes --cleanup-tag
-            echo "Deleted prerelease $tag"
-          else
-            echo "$tag is already published — keeping."
-          fi
