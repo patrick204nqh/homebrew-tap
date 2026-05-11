@@ -73,15 +73,22 @@ jobs:
           FORMULA: ${{ matrix.formula }}
         run: |
           set -euo pipefail
-          version=$(grep -oP '^\s+version\s+"\K[^"]+' "Formula/${FORMULA}.rb" | head -1 || true)
-          if [ -z "$version" ]; then
-            version=$(grep -oP '(?:archive/refs/tags/v|releases/download/v)\K[0-9]+\.[0-9]+\.[0-9]+' \
-              "Formula/${FORMULA}.rb" | head -1 || true)
-          fi
-          if [ -z "$version" ]; then
+          # Use Ruby (preinstalled on macOS runners) — portable and avoids
+          # BSD-vs-GNU grep/sed differences. Prefer an explicit `version "..."`
+          # line, fall back to the version embedded in the source `url`.
+          version=$(ruby -e '
+            src = File.read(ARGV[0])
+            if src =~ /^\s+version\s+"([^"]+)"/
+              print $1
+            elsif src =~ %r{(?:archive/refs/tags/v|releases/download/v)(\d+\.\d+\.\d+)}
+              print $1
+            else
+              exit 1
+            end
+          ' "Formula/${FORMULA}.rb") || {
             echo "ERROR: could not determine version for ${FORMULA}" >&2
             exit 1
-          fi
+          }
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Detected version: $version"
 

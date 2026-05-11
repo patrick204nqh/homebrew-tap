@@ -8,7 +8,7 @@ class Browserctl < Formula
   license "MIT"
 
   bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-47"
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/browserctl-v0.13.0"
     sha256 cellar: :any, arm64_sequoia: "cc29e3e18c3c8bca4b46b996bb8059520d880856295fbcf8da99c58dc5b61b26"
   end
 
