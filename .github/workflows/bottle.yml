@@ -47,6 +47,12 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+    # Per-formula concurrency on top of the workflow-level PR guard. Same-
+    # version races across PRs are made safe by `gh release upload --clobber`
+    # below, so this guard only needs to serialise within a single PR.
+    concurrency:
+      group: bottle-${{ github.event.pull_request.number }}-${{ matrix.formula }}
+      cancel-in-progress: true
     strategy:
       fail-fast: true
       max-parallel: 1
@@ -57,6 +63,28 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
+      # Extract the formula's stable version directly from the .rb file so
+      # we can derive the tag without needing brew installed yet. Mirrors
+      # the logic in release.yml: prefer an explicit `version "..."` line,
+      # fall back to the version embedded in the source `url`.
+      - name: Extract formula version
+        id: version
+        env:
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          set -euo pipefail
+          version=$(grep -oP '^\s+version\s+"\K[^"]+' "Formula/${FORMULA}.rb" | head -1 || true)
+          if [ -z "$version" ]; then
+            version=$(grep -oP '(?:archive/refs/tags/v|releases/download/v)\K[0-9]+\.[0-9]+\.[0-9]+' \
+              "Formula/${FORMULA}.rb" | head -1 || true)
+          fi
+          if [ -z "$version" ]; then
+            echo "ERROR: could not determine version for ${FORMULA}" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $version"
+
       # The bottle-commit step pushes back to the PR branch with an app token,
       # which retriggers this workflow. On the second run the bottle block is
       # already current, so short-circuit here before paying for setup-tap
@@ -65,9 +93,9 @@ jobs:
         id: check
         env:
           FORMULA: ${{ matrix.formula }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          expected_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/tap-pr-${PR_NUMBER}"
+          expected_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${FORMULA}-v${VERSION}"
           if grep -qF "root_url \"${expected_url}\"" "Formula/${FORMULA}.rb"; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Bottle block already matches ${expected_url} — skipping build."
@@ -83,14 +111,13 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         env:
           FORMULA: ${{ matrix.formula }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          version=$(brew info --json "$TAP/$FORMULA" | jq -r '.[0].versions.stable')
-          tag="tap-pr-${PR_NUMBER}"
+          tag="${FORMULA}-v${VERSION}"
           root_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}"
-          echo "version=$version"   >> "$GITHUB_OUTPUT"
-          echo "tag=$tag"           >> "$GITHUB_OUTPUT"
-          echo "root_url=$root_url" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION"    >> "$GITHUB_OUTPUT"
+          echo "tag=$tag"            >> "$GITHUB_OUTPUT"
+          echo "root_url=$root_url"  >> "$GITHUB_OUTPUT"
 
       - name: Create prerelease (if absent)
         if: steps.check.outputs.skip != 'true'
@@ -121,6 +148,8 @@ jobs:
           formula_name: ${{ matrix.formula }}
           version: ${{ steps.meta.outputs.version }}
 
+      # --clobber makes same-tag re-uploads idempotent: handles PR force-
+      # pushes and same-version rebuilds without a manual delete step.
       - name: Upload bottle to prerelease
         if: steps.check.outputs.skip != 'true'
         env:

@@ -101,7 +101,12 @@ jobs:
               --notes "$body"
           fi
 
-      - name: Prune stale tap-pr releases
+      # NOTE: PR 1 of 3 in the tap-pr-N → {formula}-v{version} migration.
+      # This step is intentionally LOG-ONLY for now so we can observe what it
+      # would do without taking destructive action while old and new schemes
+      # coexist. PR 3 removes this step entirely (replaced by the per-formula
+      # retention sweep below, which will also become active in PR 3).
+      - name: Prune stale tap-pr releases (LOG-ONLY)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -109,16 +114,54 @@ jobs:
 
           # Collect every tap-pr tag currently referenced by a formula
           referenced=$(grep -rhoP 'root_url.*releases/download/\K[^"]+' Formula/ \
-            | grep '^tap-pr-' | sort -u)
+            | grep '^tap-pr-' | sort -u || true)
 
-          # Delete published tap-pr-* releases no longer referenced by any formula
+          # Identify published tap-pr-* releases not referenced by any formula.
           gh release list --limit 100 --json tagName,isPrerelease \
             -q '.[] | select(.tagName | test("^tap-pr-")) | select(.isPrerelease == false) | .tagName' \
           | while read -r stale_tag; do
               if echo "$referenced" | grep -qx "$stale_tag"; then
                 echo "$stale_tag still referenced — keeping."
               else
-                gh release delete "$stale_tag" --yes --cleanup-tag
-                echo "Deleted stale release: $stale_tag"
+                echo "DRY-RUN would delete: $stale_tag"
               fi
             done
+
+      # NOTE: PR 1 of 3 — new retention sweep added in LOG-ONLY mode.
+      # For each formula, list its published {formula}-v* releases, sort by
+      # publishedAt desc, keep the 5 most recent, log the rest as would-prune.
+      # PR 3 flips this step to active deletion.
+      - name: Retention sweep (LOG-ONLY)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          KEEP=5
+          for rb in Formula/*.rb; do
+            [ -e "$rb" ] || continue
+            formula=$(basename "$rb" .rb)
+            echo "=== Retention sweep for ${formula} (keep ${KEEP}) ==="
+
+            # Fetch published per-formula releases, newest first.
+            tags=$(gh release list --limit 1000 \
+              --json tagName,isPrerelease,publishedAt \
+              -q ".[] | select(.tagName | startswith(\"${formula}-v\")) | select(.isPrerelease == false) | [.publishedAt, .tagName] | @tsv" \
+              | sort -r \
+              | awk -F'\t' '{print $2}')
+
+            if [ -z "$tags" ]; then
+              echo "  no published releases for ${formula} — nothing to sweep."
+              continue
+            fi
+
+            i=0
+            while IFS= read -r tag; do
+              i=$((i + 1))
+              if [ "$i" -le "$KEEP" ]; then
+                echo "  keep[$i]: $tag"
+              else
+                echo "  DRY-RUN would prune: $tag"
+              fi
+            done <<< "$tags"
+          done
