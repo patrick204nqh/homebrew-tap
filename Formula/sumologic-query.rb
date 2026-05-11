@@ -7,12 +7,6 @@ class SumologicQuery < Formula
   sha256 "4282fc7daa74ffd3a4d37bf87447b1282cd3ec7ee4217f63bd17a84592610620"
   license "MIT"
 
-  bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/tap-pr-21"
-    rebuild 4
-    sha256 cellar: :any, arm64_sequoia: "a3367a1ded5049ff13835d35bc3b4beca588421e2613846f25210fd04d792e3d"
-  end
-
   depends_on "gmp"
 
   # Shared relocatable Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.

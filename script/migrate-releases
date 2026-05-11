@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Migrate bottle releases from `tap-pr-N` to `{formula}-v{version}`.
+#
+# Idempotent: re-running is safe.
+# - If the destination release already exists, the formula is skipped.
+# - If the source release is missing (already pruned), the formula is logged
+#   as `missing` so it can be re-bottled separately. The script does NOT
+#   exit non-zero in this case.
+#
+# Requires: gh (authenticated), repo checked out at root.
+
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo_root"
+
+declare -a summary=()
+
+for formula_path in Formula/*.rb; do
+  formula="$(basename "$formula_path" .rb)"
+
+  old_tag="$(grep -E '^\s*root_url\s+"' "$formula_path" \
+    | sed -E 's|.*/releases/download/([^"]+)".*|\1|' \
+    | head -n1)"
+
+  if [[ -z "$old_tag" ]]; then
+    echo "SKIP: $formula has no bottle root_url"
+    summary+=("$formula | (none) | (none) | no-bottle")
+    continue
+  fi
+
+  version="$( { grep -E '^\s*version\s+"' "$formula_path" || true; } \
+    | sed -E 's|.*version\s+"([^"]+)".*|\1|' \
+    | head -n1)"
+
+  if [[ -z "$version" ]]; then
+    version="$( { grep -E '^\s*url\s+"' "$formula_path" || true; } \
+      | { grep -oE '(archive/refs/tags/v|releases/download/v)[0-9]+\.[0-9]+\.[0-9]+' || true; } \
+      | { grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true; } \
+      | head -n1)"
+  fi
+
+  if [[ -z "$version" ]]; then
+    echo "ERROR: cannot extract version for $formula" >&2
+    summary+=("$formula | $old_tag | (unknown) | error")
+    continue
+  fi
+
+  new_tag="${formula}-v${version}"
+
+  if gh release view "$new_tag" >/dev/null 2>&1; then
+    echo "SKIP: $new_tag already exists (already migrated)"
+    summary+=("$formula | $old_tag | $new_tag | skipped")
+    continue
+  fi
+
+  tmp_dir="/tmp/migrate-${formula}"
+  rm -rf "$tmp_dir"
+  mkdir -p "$tmp_dir"
+
+  if ! gh release download "$old_tag" -D "$tmp_dir" 2>/tmp/migrate-err.log; then
+    echo "WARN: old release $old_tag missing — formula $formula must be re-bottled separately"
+    cat /tmp/migrate-err.log >&2 || true
+    summary+=("$formula | $old_tag | $new_tag | missing")
+    continue
+  fi
+
+  echo "MIGRATE: $formula  $old_tag -> $new_tag"
+  gh release create "$new_tag" \
+    --target main \
+    --title "$new_tag" \
+    --notes "Migrated from $old_tag" \
+    "$tmp_dir"/*
+  summary+=("$formula | $old_tag | $new_tag | migrated")
+done
+
+echo
+echo "=== Migration summary ==="
+printf '%s\n' "formula | old_tag | new_tag | status"
+printf '%s\n' "------- | ------- | ------- | ------"
+for row in "${summary[@]}"; do
+  printf '%s\n' "$row"
+done
