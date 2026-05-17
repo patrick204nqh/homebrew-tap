@@ -7,6 +7,11 @@ class Browserctl < Formula
   sha256 "75f0adcbad7ed5247a89fb332599305ffea5dd277177745b00433946acfe0e1e"
   license "MIT"
 
+  bottle do
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/browserctl-v0.15.0"
+    sha256 cellar: :any, arm64_sequoia: "b79ee6cb620ce6200d3c34421963ff2c29969b6c60ef56ce87ac8aa8b8137ffe"
+  end
+
   depends_on "gmp"
 
   # Bundled Ruby runtime — built by .github/workflows/build-ruby-runtime.yml.
