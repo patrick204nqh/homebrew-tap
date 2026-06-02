@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Prints the install-relevant content digest of a formula, or with --stamp,
+# rewrites the formula so its `# bottle-source-digest:` line is current.
+#
+# Usage:
+#   script/formula-digest Formula/<name>.rb            # print digest
+#   script/formula-digest --stamp Formula/<name>.rb    # rewrite in place
+
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "tap_gen/formula_digest"
+
+stamp = ARGV.delete("--stamp")
+path  = ARGV[0]
+abort "Usage: script/formula-digest [--stamp] Formula/<name>.rb" unless path && File.exist?(path)
+
+text = File.read(path)
+if stamp
+  File.write(path, TapGen::FormulaDigest.stamp(text))
+else
+  puts TapGen::FormulaDigest.compute(text)
+end
