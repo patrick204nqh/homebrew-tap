@@ -1,0 +1,79 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Regenerates a formula's bundled gem `resource` blocks from the upstream
+# project's dependency graph. Operates at the formula's CURRENT version — it
+# does not bump the version or source sha256 (see update-formula.rb for that).
+#
+# Upstream projects ship a Gemfile + gemspec but no committed Gemfile.lock, so
+# we generate one with `bundle lock` (network, no install) before resolving.
+#
+# Usage: script/gen-formula <name>
+#   name   Formula name, e.g. browserctl (resolves Formula/browserctl.rb)
+
+require "tmpdir"
+require "open-uri"
+require "bundler"
+
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "tap_gen/resolver"
+require "tap_gen/rubygems"
+require "tap_gen/formula_writer"
+
+USAGE = "Usage: script/gen-formula <name>"
+abort USAGE if ARGV.length != 1
+
+name = ARGV[0]
+path = File.join(Dir.pwd, "Formula", "#{name}.rb")
+abort "ERROR: #{path} not found" unless File.exist?(path)
+
+src = File.read(path)
+
+source_url = src[/^\s*url\s+"([^"]+)"/, 1]
+abort "ERROR: no source url in #{path}" unless source_url
+
+version = source_url[%r{/v(\d+\.\d+\.\d+)\.tar\.gz}, 1]
+abort "ERROR: could not parse version from #{source_url}" unless version
+
+puts "#{name}: regenerating gem resources at v#{version}"
+puts "  source: #{source_url}"
+
+resources = Dir.mktmpdir do |dir|
+  tarball = File.join(dir, "src.tar.gz")
+  URI.parse(source_url).open { |io| File.binwrite(tarball, io.read) }
+  system("tar", "-xzf", tarball, "-C", dir) || abort("ERROR: failed to extract tarball")
+
+  # GitHub archive tarballs extract to a single <repo>-<version>/ directory.
+  source_dir = Dir.children(dir)
+                  .map { |c| File.join(dir, c) }
+                  .find { |p| File.directory?(p) && File.exist?(File.join(p, "Gemfile")) }
+  abort "ERROR: no Gemfile found in extracted source" unless source_dir
+
+  lockfile = File.join(source_dir, "Gemfile.lock")
+  unless File.exist?(lockfile)
+    puts "  no Gemfile.lock in source — running `bundle lock`"
+    ok = Bundler.with_unbundled_env do
+      system({ "BUNDLE_GEMFILE" => File.join(source_dir, "Gemfile") },
+             "bundle", "lock", chdir: source_dir)
+    end
+    abort "ERROR: `bundle lock` failed for #{name}" unless ok && File.exist?(lockfile)
+  end
+
+  gems = TapGen::Resolver.runtime_gems(source_dir)
+  puts "  resolved #{gems.size} runtime gem(s)"
+
+  gems.map do |gem_name, gem_version|
+    r = TapGen::Rubygems.resolve(gem_name, gem_version)
+    platform_suffix = r.platform ? " (#{r.platform})" : nil
+    puts "    #{gem_name} #{gem_version}#{platform_suffix}"
+    r
+  end
+end
+
+new_src = TapGen::FormulaWriter.replace_gem_section(src, resources)
+if new_src == src
+  puts "  no changes"
+else
+  File.write(path, new_src)
+  puts "  wrote #{path}"
+end

@@ -1,0 +1,8 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+gemspec
+
+# A dev tool listed OUTSIDE any group block — Bundler puts it in :default.
+# runtime_gems must still exclude it (it is not a runtime dep of `flat`).
+gem "rake"

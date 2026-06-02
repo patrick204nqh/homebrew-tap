@@ -1,0 +1,23 @@
+PATH
+  remote: .
+  specs:
+    flat (0.1.0)
+      thor (= 1.5.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    minitest (5.0.0)
+    rake (13.0.0)
+    thor (1.5.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  flat!
+  minitest (= 5.0.0)
+  rake
+
+BUNDLED WITH
+   2.5.0

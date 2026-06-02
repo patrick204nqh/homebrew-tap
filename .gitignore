@@ -14,6 +14,8 @@ Thumbs.db
 
 # Dev dependencies
 Gemfile.lock
+# …but test fixtures must ship their lockfiles (they are resolver input).
+!test/fixtures/**/Gemfile.lock
 
 # CI-generated PR body for sync-gems workflow — not committed
 sync_gems_summary.md
@@ -25,3 +27,4 @@ tarball.tar.gz
 
 # Bottle directory (artifacts live in GitHub Releases, not git)
 bottles/
+docs/plans/

@@ -2,6 +2,11 @@
 
 source "https://rubygems.org"
 
+gem "lefthook", require: false
 gem "rubocop", require: false
 gem "rubocop-performance", require: false
-gem "lefthook", require: false
+
+group :development do
+  gem "minitest", require: false
+  gem "rake", require: false
+end
