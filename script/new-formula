@@ -87,18 +87,8 @@ formula = <<~RUBY
       sha256 "#{runtime_sha}"
     end
 
-    # Add runtime gem dependencies below. For each gem in the upstream Gemfile.lock,
-    # add a resource block with the pinned version and sha256:
-    #
-    #   resource "gem-name" do
-    #     url "https://rubygems.org/downloads/gem-name-VERSION.gem"
-    #     sha256 "SHA256"
-    #   end
-    #
-    # For gems with native extensions, use the arm64-darwin platform gem:
-    #   url "https://rubygems.org/downloads/nokogiri-VERSION-arm64-darwin.gem"
-    #
-    # Omit development/test gems.
+    # ── BEGIN generated gem resources — managed by script/gen-formula, do not edit ──
+    # ── END generated gem resources ──
 
     def install
       ruby_runtime = libexec / "ruby-runtime"
@@ -165,7 +155,8 @@ puts <<~MSG
   Next steps:
     1. Set the version, url, sha256, and license:
          curl -fsSL https://github.com/#{repo}/archive/refs/tags/vX.Y.Z.tar.gz | shasum -a 256
-    2. Add gem resource blocks for each runtime dependency in the upstream Gemfile.lock.
+    2. Generate the gem resources:
+         bundle exec ruby script/gen-formula #{name}
     3. Verify locally:
          brew install --build-from-source ./#{target}
          brew test patrick204nqh/tap/#{name}
