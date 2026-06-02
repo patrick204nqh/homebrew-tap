@@ -76,17 +76,7 @@ jobs:
               "Formula/${FORMULA}.rb" | head -1)
           fi
 
-          # Extract PR number from tag (tap-pr-N)
-          pr_number=$(echo "$tag" | grep -oP '(?<=tap-pr-)\d+' || true)
-
-          # Compose release body
-          if [ -n "$pr_number" ]; then
-            pr_ref="merged via [PR #${pr_number}](https://github.com/${GITHUB_REPOSITORY}/pull/${pr_number})"
-          else
-            pr_ref="deployed to \`main\`"
-          fi
-
-          body="Bottles for \`${FORMULA}\` v${version} — built and verified by CI, ${pr_ref}."
+          body="Bottles for \`${FORMULA}\` v${version} — built and verified by CI, deployed to \`main\`."
 
           is_prerelease=$(gh release view "$tag" --json isPrerelease -q '.isPrerelease')
           if [ "$is_prerelease" = "true" ]; then
