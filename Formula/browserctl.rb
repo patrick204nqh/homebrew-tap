@@ -29,26 +29,10 @@ class Browserctl < Formula
     sha256 "20d0fdb6de2cec6c8085e1edf3553f9cab3437932087ff451ca44a7727dc7a40"
   end
 
-  # nokogiri — precompiled arm64 platform gem (avoids needing libxml2/libxslt)
-  resource "nokogiri" do
-    url "https://rubygems.org/downloads/nokogiri-1.19.3-arm64-darwin.gem"
-    sha256 "71b9bd424b1b7abc18b05052a1a3cfd3627abdca62be280854cc411791357e42"
-  end
-
-  # ferrum and its transitive deps
-  resource "ferrum" do
-    url "https://rubygems.org/downloads/ferrum-0.17.2.gem"
-    sha256 "2c2540a850b211a46f4d81de21bfd62048f507e4c327d1807225c3823c17e6ee"
-  end
-
+  # ── BEGIN generated gem resources — managed by script/gen-formula, do not edit ──
   resource "addressable" do
     url "https://rubygems.org/downloads/addressable-2.9.0.gem"
     sha256 "7fdf6ac3660f7f4e867a0838be3f6cf722ace541dd97767fa42bc6cfa980c7af"
-  end
-
-  resource "public_suffix" do
-    url "https://rubygems.org/downloads/public_suffix-7.0.5.gem"
-    sha256 "1a8bb08f1bbea19228d3bed6e5ed908d1cb4f7c2726d18bd9cadf60bc676f623"
   end
 
   resource "base64" do
@@ -59,6 +43,31 @@ class Browserctl < Formula
   resource "concurrent-ruby" do
     url "https://rubygems.org/downloads/concurrent-ruby-1.3.6.gem"
     sha256 "6b56837e1e7e5292f9864f34b69c5a2cbc75c0cf5338f1ce9903d10fa762d5ab"
+  end
+
+  resource "ferrum" do
+    url "https://rubygems.org/downloads/ferrum-0.17.2.gem"
+    sha256 "2c2540a850b211a46f4d81de21bfd62048f507e4c327d1807225c3823c17e6ee"
+  end
+
+  resource "nokogiri" do
+    url "https://rubygems.org/downloads/nokogiri-1.19.3-arm64-darwin.gem"
+    sha256 "71b9bd424b1b7abc18b05052a1a3cfd3627abdca62be280854cc411791357e42"
+  end
+
+  resource "optimist" do
+    url "https://rubygems.org/downloads/optimist-3.2.1.gem"
+    sha256 "8cf8a0fd69f3aa24ab48885d3a666717c27bc3d9edd6e976e18b9d771e72e34e"
+  end
+
+  resource "public_suffix" do
+    url "https://rubygems.org/downloads/public_suffix-7.0.5.gem"
+    sha256 "1a8bb08f1bbea19228d3bed6e5ed908d1cb4f7c2726d18bd9cadf60bc676f623"
+  end
+
+  resource "racc" do
+    url "https://rubygems.org/downloads/racc-1.8.1.gem"
+    sha256 "4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f"
   end
 
   resource "webrick" do
@@ -75,11 +84,7 @@ class Browserctl < Formula
     url "https://rubygems.org/downloads/websocket-extensions-0.1.5.gem"
     sha256 "1c6ba63092cda343eb53fc657110c71c754c56484aad42578495227d717a8241"
   end
-
-  resource "optimist" do
-    url "https://rubygems.org/downloads/optimist-3.2.1.gem"
-    sha256 "8cf8a0fd69f3aa24ab48885d3a666717c27bc3d9edd6e976e18b9d771e72e34e"
-  end
+  # ── END generated gem resources ──
 
   def install
     ruby_runtime = libexec / "ruby-runtime"

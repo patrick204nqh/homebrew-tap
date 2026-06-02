@@ -27,15 +27,17 @@ class SumologicQuery < Formula
     sha256 "20d0fdb6de2cec6c8085e1edf3553f9cab3437932087ff451ca44a7727dc7a40"
   end
 
-  resource "thor" do
-    url "https://rubygems.org/downloads/thor-1.5.0.gem"
-    sha256 "e3a9e55fe857e44859ce104a84675ab6e8cd59c650a49106a05f55f136425e73"
-  end
-
+  # ── BEGIN generated gem resources — managed by script/gen-formula, do not edit ──
   resource "base64" do
     url "https://rubygems.org/downloads/base64-0.3.0.gem"
     sha256 "27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b"
   end
+
+  resource "thor" do
+    url "https://rubygems.org/downloads/thor-1.5.0.gem"
+    sha256 "e3a9e55fe857e44859ce104a84675ab6e8cd59c650a49106a05f55f136425e73"
+  end
+  # ── END generated gem resources ──
 
   def install
     ruby_runtime = libexec / "ruby-runtime"
