@@ -113,6 +113,11 @@ class FormulaWriterTest < Minitest::Test
     assert_match(/#{Regexp.escape(TapGen::FormulaWriter::END_MARKER)}\n\n  def install/, out)
   end
 
+  def test_empty_resources_render_markers_with_no_blank_line_between
+    section = TapGen::FormulaWriter.render_section([])
+    assert_equal "#{TapGen::FormulaWriter::BEGIN_MARKER}\n#{TapGen::FormulaWriter::END_MARKER}\n", section
+  end
+
   def test_raises_when_no_gem_resources_present
     src = "class Empty < Formula\n  def install; end\nend\n"
     assert_raises(TapGen::FormulaWriter::NoGemSection) do

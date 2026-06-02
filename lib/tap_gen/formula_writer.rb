@@ -26,7 +26,8 @@ module TapGen
     # clears the managed section (correct for a tool with no runtime gems).
     def self.render_section(resources)
       body = resources.map { |r| r.to_block(indent: 2) }.join("\n\n")
-      "#{BEGIN_MARKER}\n#{body}\n#{END_MARKER}\n"
+      parts = [BEGIN_MARKER, body.empty? ? nil : body, END_MARKER].compact
+      "#{parts.join("\n")}\n"
     end
 
     def self.replace_gem_section(text, resources)
