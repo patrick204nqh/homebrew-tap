@@ -37,14 +37,20 @@ module TapGen
         return text.sub(re, section)
       end
 
-      first = text.match(RESOURCE_RE)
-      raise NoGemSection, "no rubygems.org resource blocks found — cannot determine splice point" unless first
+      matches = []
+      text.scan(RESOURCE_RE) { matches << Regexp.last_match }
+      raise NoGemSection, "no rubygems.org resource blocks found — cannot determine splice point" if matches.empty?
 
-      before = text[0...first.begin(0)]
-      after  = text[first.begin(0)..]
-      after_clean = after.gsub(RESOURCE_RE, "").sub(/\A\n+/, "")
+      # Replace the whole span from the first to the last rubygems resource
+      # block — this drops any explanatory comments and blank lines woven
+      # between them (they describe gems and are superseded by the generated
+      # section). Also absorb a run of gem-annotation comment/blank lines
+      # immediately preceding the first block. The result is normalised to one
+      # blank line on each side of the generated section.
+      before = text[0...matches.first.begin(0)].sub(/(?:[ \t]*#[^\n]*\n|[ \t]*\n)+\z/, "")
+      after  = text[matches.last.end(0)..].sub(/\A\n+/, "")
 
-      "#{before}#{section}\n#{after_clean}"
+      "#{before.rstrip}\n\n#{section}\n#{after}"
     end
   end
 end
