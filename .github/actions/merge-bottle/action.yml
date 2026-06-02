@@ -30,3 +30,7 @@ runs:
         fi
         [ "$old_bottle" != "$new_bottle" ] && mv "$old_bottle" "$new_bottle"
         echo "BOTTLE_FILE=$new_bottle" >> "$GITHUB_ENV"
+
+        # Stamp the install-relevant content digest above the bottle block so
+        # bottle.yml can detect same-version gem changes on the next run.
+        ruby script/formula-digest --stamp "Formula/${formula_name}.rb"

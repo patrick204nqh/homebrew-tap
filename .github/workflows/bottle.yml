@@ -102,12 +102,19 @@ jobs:
           FORMULA: ${{ matrix.formula }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          expected_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${FORMULA}-v${VERSION}"
-          if grep -qF "root_url \"${expected_url}\"" "Formula/${FORMULA}.rb"; then
+          # Rebuild unless the formula's install-relevant content digest already
+          # matches the one stamped into the bottle block by a prior build. This
+          # catches same-version gem-resource changes (a `root_url` check would
+          # not) while still short-circuiting the bot's bottle commit-back loop.
+          current=$(ruby script/formula-digest "Formula/${FORMULA}.rb")
+          stored=$(grep -oE '# bottle-source-digest: [a-f0-9]{64}' "Formula/${FORMULA}.rb" \
+                   | grep -oE '[a-f0-9]{64}' || true)
+          if [ -n "$stored" ] && [ "$current" = "$stored" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Bottle block already matches ${expected_url} — skipping build."
+            echo "Formula digest unchanged ($current) — bottle is current, skipping build."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Formula digest changed (stored='${stored:-none}', current='$current') — rebuilding."
           fi
 
       - uses: ./.github/actions/setup-tap
