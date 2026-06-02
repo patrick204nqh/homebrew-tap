@@ -78,7 +78,6 @@ jobs:
   open-pr:
     name: Open Update PR
     needs: detect
-    if: needs.detect.outputs.updates != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -86,6 +85,11 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
 
       - name: Generate app token
         id: app-token
@@ -133,8 +137,21 @@ jobs:
             rm -f tarball.tar.gz
 
             ruby .github/scripts/update-formula.rb "Formula/${name}.rb" "$latest" "$sha256"
-            echo "Updated $name: $current → $latest"
+            echo "Updated $name source: $current → $latest"
+
+            # Regenerate the gem resources from the new version's dependency
+            # graph. Runs `bundle lock` internally (upstream ships no lockfile).
+            bundle exec ruby script/gen-formula "$name"
+            echo "Regenerated $name gem resources"
           done < <(echo "$UPDATES" | jq -c '.[]')
+
+          # Even when the source version is current, upstream gem versions may
+          # have moved. Regenerate every formula; only real diffs get committed.
+          for rb in Formula/*.rb; do
+            fname=$(basename "$rb" .rb)
+            bundle exec ruby script/gen-formula "$fname" || {
+              echo "WARN: gen-formula failed for $fname (skipping)"; continue; }
+          done
 
           git add Formula/
           if git diff --cached --quiet; then
@@ -145,7 +162,7 @@ jobs:
           summary=$(echo "$UPDATES" | jq -r \
             '.[] | select(.current != .latest) | "- `\(.name)`: \(.current) → \(.latest)"')
 
-          git commit -m "chore: sync formula versions"
+          git commit -m "chore: sync formula versions and gem resources"
           git push --force origin "$branch"
 
           existing=$(gh pr list --head "$branch" --json number --jq '.[0].number // empty')
@@ -154,7 +171,7 @@ jobs:
           else
             gh pr create \
               --title "chore: sync formula versions $(date -u +%Y-%m-%d)" \
-              --body "$(printf 'Automated weekly formula version sync.\n\n## Updates\n\n%s\n\nCI will build and verify bottles before this PR can be merged.' "$summary")" \
+              --body "$(printf 'Automated weekly formula version + gem-resource sync.\n\n## Updates\n\n%s\n\nCI will build and verify bottles before this PR can be merged.' "$summary")" \
               --base main \
               --head "$branch" \
               --label "formula-update"
