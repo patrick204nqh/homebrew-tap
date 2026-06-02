@@ -1,0 +1,21 @@
+PATH
+  remote: .
+  specs:
+    deep (0.1.0)
+      mid (= 1.0.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    leaf (2.0.0)
+    mid (1.0.0)
+      leaf (= 2.0.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  deep!
+
+BUNDLED WITH
+   2.5.0

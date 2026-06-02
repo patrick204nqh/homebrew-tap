@@ -1,0 +1,21 @@
+PATH
+  remote: .
+  specs:
+    sample (0.1.0)
+      thor (= 1.5.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    minitest (5.0.0)
+    thor (1.5.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  minitest (= 5.0.0)
+  sample!
+
+BUNDLED WITH
+   2.5.0
