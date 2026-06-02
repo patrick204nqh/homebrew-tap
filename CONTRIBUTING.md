@@ -64,8 +64,13 @@ existing formula so the new one starts in sync. It prints a TODO checklist
 with the remaining steps.
 
 1. Fill in `desc`, `url`, `sha256`, and `license` in the generated formula.
-2. Add gem `resource` blocks for each runtime dependency from the upstream
-   `Gemfile.lock` (see [Formula conventions](#formula-conventions) below).
+2. Generate the gem `resource` blocks from the upstream dependency graph:
+
+   ```bash
+   bundle exec ruby script/gen-formula <tool-name>
+   ```
+
+   (see [Formula conventions](#formula-conventions) below).
 3. Test locally before opening a PR:
 
    ```bash
@@ -95,18 +100,27 @@ To trigger an out-of-band update immediately:
 
 ## Updating bundled gem versions
 
-Each Ruby-based formula pins its gem dependencies as `resource` blocks.
-[`sync-gems.yml`](.github/workflows/sync-gems.yml) checks RubyGems.org weekly
-(Sunday 22:00 UTC) for newer versions of those gems and opens a PR with
-any updates. CI builds and verifies new bottles before you merge.
+Each Ruby-based formula's gem `resource` blocks are **generated**, never hand-edited.
+They live between `# ── BEGIN/END generated gem resources` markers. To regenerate
+them from the upstream project's dependency graph:
 
-To trigger an out-of-band check immediately:
+```bash
+bundle exec ruby script/gen-formula <formula-name>
+```
 
-1. Go to **Actions → Sync Gems → Run workflow**.
-2. Review the opened PR (one PR covers all formulas) and merge when CI passes.
+This resolves the formula's current source, generates a `Gemfile.lock` with
+`bundle lock` (the upstream projects don't commit one), walks the project gem's
+runtime dependency closure, fetches each gem's SHA256 from RubyGems (preferring
+the `arm64-darwin` platform build when one exists), and rewrites the marked
+section. It needs network access. It does **not** bump the formula's source
+version, and it never touches the `resource "ruby-runtime"` block (managed
+separately).
 
-> **Note:** `sync-gems.yml` only bumps the gem `resource` blocks. It does not
-> update the formula's own source version — that is handled by `sync-formulas.yml`.
+Because it resolves the full closure, `gen-formula` captures newly added
+transitive dependencies automatically — the class of drift the older
+[`sync-gems.yml`](.github/workflows/sync-gems.yml) (which only bumps versions of
+gems already listed) cannot detect. `sync-gems.yml` is being retired in favour
+of `gen-formula`.
 
 ## Updating the bundled Ruby runtime
 
@@ -134,7 +148,7 @@ rationale behind arm64-only bottles.
 ## Formula conventions
 
 - All Ruby-based formulas bundle the tap's shared Ruby runtime via a `resource "ruby-runtime"` block — do not use `depends_on "ruby"` or `uses_from_macos "ruby"`.
-- List all runtime gem dependencies as `resource` blocks with pinned SHA256s taken from the project's `Gemfile.lock`.
+- Runtime gem dependencies live as `resource` blocks between the `# ── BEGIN/END generated gem resources` markers and are produced by `script/gen-formula` — do not hand-edit them. The `resource "ruby-runtime"` block sits outside the markers and is managed separately.
 - Install gems to `libexec` using `r.stage { system bundled_gem, "install", ... }` and expose binaries via `write_env_script` with `GEM_HOME`/`GEM_PATH` pointed at `libexec`.
 - For precompiled platform gems (e.g. nokogiri), use the `arm64-darwin` variant — bottles are arm64-only (see ADR 001).
 - Order formula sections: `desc`, `homepage`, `url`, `sha256`, `license`, `RUBY_RUNTIME_VERSION` constant, dependencies, resources, `def install`, `def post_install` (if needed), `def caveats`, `test`, private helpers.
@@ -151,6 +165,7 @@ Scripts live in two directories with distinct purposes:
 
 **`script/` scripts:**
 - `script/new-formula` — scaffolds a new Ruby-based formula
+- `script/gen-formula` — regenerates a formula's bundled gem `resource` blocks from the upstream dependency graph (see [Updating bundled gem versions](#updating-bundled-gem-versions))
 - `script/gen-completions` — regenerates shell completion files from upstream source
 - `script/relocate-runtime.rb` — fixes dylib paths and shebangs after the ruby-runtime is staged; also bundled into the runtime tarball by `build-ruby-runtime.yml`
 
