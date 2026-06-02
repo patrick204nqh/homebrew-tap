@@ -23,6 +23,11 @@ flowchart TD
     style BOTTLE_SKIP fill:#f3f4f6,stroke:#d1d5db
 ```
 
+`bottle.yml` short-circuits via a `# bottle-source-digest:` check: it rebuilds
+only when the formula's install-relevant content (everything except the bottle
+block) has changed. This catches same-version gem-resource updates while the
+bot's bottle commit-back still skips re-building on its own push.
+
 When a PR is **closed without merging**, `cleanup.yml` fires and deletes
 any prerelease that was created during CI.
 
@@ -54,22 +59,33 @@ flowchart TD
 
 ## 3. Sync Formulas — Weekly (`sync-formulas.yml`)
 
+One weekly job bumps source versions **and** regenerates gem resources. After
+any version bump it runs `gen-formula`, and it also regenerates every formula
+unconditionally to catch same-version gem drift. Only real diffs get committed,
+so an all-current run opens no PR. (The retired `sync-gems.yml` is folded in
+here.)
+
 ```mermaid
 flowchart TD
     T([cron Sun 23:00 UTC / workflow_dispatch])
 
     DETECT[Detect Updates\ncheck upstream GitHub releases\nvs current formula versions]
-    OPEN_PR[Open Update PR\nupdate version + sha256\nopen PR on sync/formula-updates-YYYY-MM-DD]
-    SKIP([skip — all formulas up to date])
+    BUMP[Bump version + sha256\nfor each formula with a newer release]
+    REGEN[Regenerate gem resources\ngen-formula rebuilds every formula's\ngem closure from a fresh lockfile]
+    DIFF{any diff?}
+    OPEN_PR[Open Update PR\nversion + gem-resource changes\nsync/formula-updates-YYYY-MM-DD]
+    SKIP([skip — nothing changed])
 
-    T --> DETECT
-    DETECT -->|updates found| OPEN_PR
-    DETECT -->|nothing to update| SKIP
+    T --> DETECT --> BUMP --> REGEN --> DIFF
+    DIFF -->|changes| OPEN_PR
+    DIFF -->|no changes| SKIP
 
     OPEN_PR -.->|CI runs automatically| CI[validate.yml + bottle.yml\nlint · audit · build + verify bottles]
     CI -.->|PR merged| RELEASE[release.yml\npublish bottles]
 
     style DETECT   fill:#dbeafe,stroke:#93c5fd
+    style BUMP     fill:#dcfce7,stroke:#86efac
+    style REGEN    fill:#dcfce7,stroke:#86efac
     style OPEN_PR  fill:#fef9c3,stroke:#fde047
     style SKIP     fill:#f3f4f6,stroke:#d1d5db
     style CI       fill:#dcfce7,stroke:#86efac
@@ -78,35 +94,7 @@ flowchart TD
 
 ---
 
-## 4. Sync Gems — Weekly (`sync-gems.yml`)
-
-```mermaid
-flowchart TD
-    T([cron Sun 22:00 UTC / workflow_dispatch])
-
-    CHECK[Check Gem Versions\nquery RubyGems API for each resource block\nvs current pinned versions]
-    UPDATE[Update Formulas\ndownload new gems · compute sha256\nwrite updated resource blocks]
-    OPEN_PR[Open Update PR\nopen PR on sync/gem-updates-YYYY-MM-DD]
-    SKIP([skip — all gems up to date])
-
-    T --> CHECK
-    CHECK -->|updates found| UPDATE --> OPEN_PR
-    CHECK -->|nothing to update| SKIP
-
-    OPEN_PR -.->|CI runs automatically| CI[validate.yml + bottle.yml\nlint · audit · build + verify bottles]
-    CI -.->|PR merged| RELEASE[release.yml\npublish bottles]
-
-    style CHECK    fill:#dbeafe,stroke:#93c5fd
-    style UPDATE   fill:#dcfce7,stroke:#86efac
-    style OPEN_PR  fill:#fef9c3,stroke:#fde047
-    style SKIP     fill:#f3f4f6,stroke:#d1d5db
-    style CI       fill:#dcfce7,stroke:#86efac
-    style RELEASE  fill:#dcfce7,stroke:#86efac
-```
-
----
-
-## 5. Sync Ruby Runtime — Weekly (`sync-ruby-runtime.yml`)
+## 4. Sync Ruby Runtime — Weekly (`sync-ruby-runtime.yml`)
 
 ```mermaid
 flowchart TD
@@ -131,7 +119,7 @@ flowchart TD
 
 ---
 
-## 6. Build Ruby Runtime — Manual / Auto (`build-ruby-runtime.yml`)
+## 5. Build Ruby Runtime — Manual / Auto (`build-ruby-runtime.yml`)
 
 ```mermaid
 flowchart TD

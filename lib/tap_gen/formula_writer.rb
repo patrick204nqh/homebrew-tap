@@ -13,7 +13,7 @@ module TapGen
     END_MARKER = "  # ── END generated gem resources ──"
 
     # Matches one single-line rubygems resource block, including its trailing
-    # newline. Mirrors .github/scripts/sync-gems.rb.
+    # newline.
     RESOURCE_RE = %r{
       ^([ \t]*)resource\ "[^"]+"\ do\n
       [ \t]*url\ "https://rubygems\.org/downloads/[^"]+\.gem"\n
