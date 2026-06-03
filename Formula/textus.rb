@@ -3,14 +3,14 @@
 class Textus < Formula
   desc "Durable multi-writer project memory for humans, AI, and automation"
   homepage "https://github.com/patrick204nqh/textus"
-  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.43.2.tar.gz"
-  sha256 "94f93a0aead80573f589d404abfd5cc7571cfb7684b069c4aa15725a3e5ecfc2"
+  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.45.1.tar.gz"
+  sha256 "e7969ca3958df131aaff0f92ec61b2325ac41ec836671ac5fbd44258116913b4"
   license "MIT"
 
-  # bottle-source-digest: 2c45a2791a797efac896405c3f26c6ce72f66238f57c8430d5ec2ef951717f45
+  # bottle-source-digest: 99ca264c2f7a660af53b25a53256c127d8ca7c9dce5fcc221cbdf052b13c4f2d
   bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/textus-v0.43.2"
-    sha256 cellar: :any, arm64_sequoia: "ba1d4a29b4e4ff7fa5d421931abe71636b5574cb9f1fe2a4c28262a00376a3a8"
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/textus-v0.45.1"
+    sha256 cellar: :any, arm64_sequoia: "6f98f9cf68b074c00b77bd1a0e8189133474bf6c45ca5d16a67b118b4e967f4f"
   end
 
   depends_on "gmp"
@@ -92,6 +92,31 @@ class Textus < Formula
       PATH:     "#{ruby_runtime / "bin"}#{File::PATH_SEPARATOR}#{ENV.fetch("PATH", nil)}",
     }
     (bin / "textus").write_env_script(libexec / "bin/textus", env)
+  end
+
+  def post_install
+    # When a bottle built on an older darwin is poured on a newer one,
+    # native extension .bundles land in the wrong platform directory.
+    # They are binary-compatible within the same Ruby major.minor + arch,
+    # so we symlink the built platform dir to the current one.
+    bundled_ruby = libexec / "ruby-runtime/bin/ruby"
+    current_platform = Utils.safe_popen_read(bundled_ruby, "-e", "puts Gem::Platform.local").chomp
+    ext_dir = libexec / "gems/extensions"
+    return unless ext_dir.exist?
+    return if (ext_dir / current_platform).exist?
+
+    ext_dir.each_child do |src|
+      next unless src.directory?
+
+      dst = ext_dir / current_platform
+      dst.mkpath
+      src.each_child do |ver_dir|
+        next unless ver_dir.directory?
+
+        dst_ver = dst / ver_dir.basename
+        ln_sf ver_dir, dst_ver unless dst_ver.exist?
+      end
+    end
   end
 
   def caveats
