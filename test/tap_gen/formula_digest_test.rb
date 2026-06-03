@@ -56,6 +56,29 @@ class FormulaDigestTest < Minitest::Test
     assert_match(/# bottle-source-digest: [a-f0-9]{64}\n[ \t]*bottle do/, once)
   end
 
+  def test_stamp_collapses_double_blank_left_by_bottle_rewrite
+    # `brew bottle --write` re-inserts the block on top of the blank line the
+    # previous removal left behind, yielding a double blank before `depends_on`.
+    buggy = <<~RUBY
+      class Example < Formula
+        sha256 "#{"s" * 64}"
+
+        bottle do
+          sha256 cellar: :any, arm64_sequoia: "#{"b" * 64}"
+        end
+
+
+        depends_on "gmp"
+      end
+    RUBY
+    stamped = TapGen::FormulaDigest.stamp(buggy)
+
+    refute_match(/\n\n\n/, stamped, "must not leave consecutive blank lines")
+    stored = stamped[/# bottle-source-digest: ([a-f0-9]{64})/, 1]
+    assert_equal TapGen::FormulaDigest.compute(stamped), stored,
+                 "stamped digest must match the normalized file"
+  end
+
   def test_stamp_raises_without_a_bottle_block
     assert_raises(TapGen::FormulaDigest::NoBottleBlock) do
       TapGen::FormulaDigest.stamp("class X < Formula\n  url \"u\"\nend\n")
