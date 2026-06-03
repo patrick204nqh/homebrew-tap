@@ -3,15 +3,11 @@
 class Textus < Formula
   desc "Durable multi-writer project memory for humans, AI, and automation"
   homepage "https://github.com/patrick204nqh/textus"
-  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.45.1.tar.gz"
-  sha256 "e7969ca3958df131aaff0f92ec61b2325ac41ec836671ac5fbd44258116913b4"
+  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.46.0.tar.gz"
+  sha256 "85b542fe4033b230d81045f2238c5c38e31544a9939bf07edc1b58e5c6cbe66d"
   license "MIT"
 
   # bottle-source-digest: 99ca264c2f7a660af53b25a53256c127d8ca7c9dce5fcc221cbdf052b13c4f2d
-  bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/textus-v0.45.1"
-    sha256 cellar: :any, arm64_sequoia: "6f98f9cf68b074c00b77bd1a0e8189133474bf6c45ca5d16a67b118b4e967f4f"
-  end
 
   depends_on "gmp"
 
