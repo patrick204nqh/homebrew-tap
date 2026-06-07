@@ -76,8 +76,8 @@ class Browserctl < Formula
   end
 
   resource "websocket-driver" do
-    url "https://rubygems.org/downloads/websocket-driver-0.8.0.gem"
-    sha256 "ed0dba4b943c22f17f9a734817e808bc84cdce6a7e22045f5315aa57676d4962"
+    url "https://rubygems.org/downloads/websocket-driver-0.8.1.gem"
+    sha256 "5ab238238ce230e5d4b262d2be39624c867914eab99171dc4952b58b577c2d96"
   end
 
   resource "websocket-extensions" do
