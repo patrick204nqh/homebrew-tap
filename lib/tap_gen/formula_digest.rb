@@ -32,11 +32,16 @@ module TapGen
     # Normalizing here — the last write before commit-back — keeps every bot
     # bottle commit lint-clean and the stamped digest consistent with the file.
     def stamp(text)
-      normalized = normalize(text)
-      digest = compute(normalized)
-      without = normalized.sub(DIGEST_RE, "")
+      # Remove any prior digest line *before* normalizing: `brew bottle --write`
+      # re-inserts the block above the stale digest comment, so deleting that
+      # comment fuses its surrounding blank lines into a double blank. Collapse
+      # it here, then compute and write off the cleaned text — otherwise the
+      # file is lint-dirty and the stored digest disagrees with `compute`
+      # (which normalizes before stripping), causing an endless rebuild loop.
+      without = normalize(text.sub(DIGEST_RE, ""))
       raise NoBottleBlock, "no `bottle do` block to stamp" unless without =~ /^([ \t]*)bottle do\b/
 
+      digest = compute(without)
       without.sub(/^([ \t]*)bottle do\b/) do
         indent = Regexp.last_match(1)
         "#{indent}# bottle-source-digest: #{digest}\n#{indent}bottle do"

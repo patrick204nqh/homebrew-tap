@@ -79,6 +79,31 @@ class FormulaDigestTest < Minitest::Test
                  "stamped digest must match the normalized file"
   end
 
+  def test_stamp_does_not_create_double_blank_when_removing_prior_digest
+    # `brew bottle --write` inserts the block above the existing digest comment,
+    # leaving the stale digest line between two single blank lines before
+    # `depends_on`. Removing that line must not fuse the blanks into a double.
+    src = <<~RUBY
+      class Example < Formula
+        license "MIT"
+
+        bottle do
+          sha256 cellar: :any, arm64_sequoia: "#{"b" * 64}"
+        end
+
+        # bottle-source-digest: #{"d" * 64}
+
+        depends_on "gmp"
+      end
+    RUBY
+    stamped = TapGen::FormulaDigest.stamp(src)
+
+    refute_match(/\n\n\n/, stamped, "removing the prior digest line must not leave a double blank")
+    assert_equal 1, stamped.scan("# bottle-source-digest:").size
+    stored = stamped[/# bottle-source-digest: ([a-f0-9]{64})/, 1]
+    assert_equal TapGen::FormulaDigest.compute(stamped), stored
+  end
+
   def test_stamp_raises_without_a_bottle_block
     assert_raises(TapGen::FormulaDigest::NoBottleBlock) do
       TapGen::FormulaDigest.stamp("class X < Formula\n  url \"u\"\nend\n")
