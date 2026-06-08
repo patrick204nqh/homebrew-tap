@@ -7,7 +7,12 @@ class Textus < Formula
   sha256 "d7a43266fee40987880b309c6b4c44c417ba7f206bb269c858879b63ca455761"
   license "MIT"
 
-  # bottle-source-digest: ad2b3bf6dd6139768495ba23c26d7475bf66426d11552f787abd507b129df2cb
+  # bottle-source-digest: 4af2df19f20bf3ebb60141211ec74b3ba5d670f6c7f6b42601bb95ad63798938
+  bottle do
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/textus-v0.51.0"
+    sha256 cellar: :any, arm64_sequoia: "04efbba0a9e12e0a257fecefda6caf6a7ce47d44846588a2ee103db072c2caa5"
+  end
+
 
   depends_on "gmp"
 
