@@ -3,14 +3,14 @@
 class Textus < Formula
   desc "Durable multi-writer project memory for humans, AI, and automation"
   homepage "https://github.com/patrick204nqh/textus"
-  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.52.0.tar.gz"
-  sha256 "ad46153830739e7ead7fc747726c5a587176b9aadfa06163176165b0605599e6"
+  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.53.0.tar.gz"
+  sha256 "5519e861948224d689958a31048cd3823eff615159c5d5767a36004408cb6148"
   license "MIT"
 
-  # bottle-source-digest: 3457cb260de863196529d3c54b4e58b4aac5fbf2cd42d06562879aa11230412c
+  # bottle-source-digest: 18d5555639cd59dabc06a57daf3d289892794658633c9466c81fb01bbbe359c0
   bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/textus-v0.52.0"
-    sha256 cellar: :any, arm64_sequoia: "b77f5677da4825104697e0ca56ecb852c61f4c2af7f61389d9595e28c59a4b55"
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/textus-v0.53.0"
+    sha256 cellar: :any, arm64_sequoia: "797009a9550836d814eae14801632be1703aef7dc74798c50af90559ebed586e"
   end
 
   depends_on "gmp"
@@ -35,6 +35,11 @@ class Textus < Formula
   resource "date" do
     url "https://rubygems.org/downloads/date-3.5.1.gem"
     sha256 "750d06384d7b9c15d562c76291407d89e368dda4d4fff957eb94962d325a0dc0"
+  end
+
+  resource "mustache" do
+    url "https://rubygems.org/downloads/mustache-1.1.2.gem"
+    sha256 "d420243400354da78ded2d81541b381ad8d94e8e9b95022d0d71d66f8ef36c00"
   end
 
   resource "psych" do
