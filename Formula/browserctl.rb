@@ -43,8 +43,8 @@ class Browserctl < Formula
   end
 
   resource "concurrent-ruby" do
-    url "https://rubygems.org/downloads/concurrent-ruby-1.3.6.gem"
-    sha256 "6b56837e1e7e5292f9864f34b69c5a2cbc75c0cf5338f1ce9903d10fa762d5ab"
+    url "https://rubygems.org/downloads/concurrent-ruby-1.3.7.gem"
+    sha256 "4412caec3a5ea2e5fdc52076724c071a81f2c0593d83b2ac8cbb8ca63b3151b0"
   end
 
   resource "ferrum" do
@@ -53,8 +53,8 @@ class Browserctl < Formula
   end
 
   resource "nokogiri" do
-    url "https://rubygems.org/downloads/nokogiri-1.19.3-arm64-darwin.gem"
-    sha256 "71b9bd424b1b7abc18b05052a1a3cfd3627abdca62be280854cc411791357e42"
+    url "https://rubygems.org/downloads/nokogiri-1.19.4-arm64-darwin.gem"
+    sha256 "a46db9853286e6597b36ebc6953817d15acf3a299583eb3f89fdc6f91dd63527"
   end
 
   resource "optimist" do
