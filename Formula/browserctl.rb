@@ -7,11 +7,11 @@ class Browserctl < Formula
   sha256 "75f0adcbad7ed5247a89fb332599305ffea5dd277177745b00433946acfe0e1e"
   license "MIT"
 
-  # bottle-source-digest: 7e450483d965ab7c38f81aa65b5be9a817131632471e03ecd46edbc0232a94ed
+  # bottle-source-digest: 72ad757d754cc128391f0ac12ff369784e28ea330b0ffc3c6ae2d47abdeccca5
   bottle do
     root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/browserctl-v0.15.0"
-    rebuild 1
-    sha256 cellar: :any, arm64_sequoia: "585eae0c3f89278e9b684669935fcc33d0fe83505c5e2a465ccbb0027bab67c4"
+    rebuild 2
+    sha256 cellar: :any, arm64_sequoia: "e7c238e035c2a1be734da5d13ac5803d8e7213b99329996b576222427abb1f10"
   end
 
   depends_on "gmp"
@@ -43,8 +43,8 @@ class Browserctl < Formula
   end
 
   resource "concurrent-ruby" do
-    url "https://rubygems.org/downloads/concurrent-ruby-1.3.6.gem"
-    sha256 "6b56837e1e7e5292f9864f34b69c5a2cbc75c0cf5338f1ce9903d10fa762d5ab"
+    url "https://rubygems.org/downloads/concurrent-ruby-1.3.7.gem"
+    sha256 "4412caec3a5ea2e5fdc52076724c071a81f2c0593d83b2ac8cbb8ca63b3151b0"
   end
 
   resource "ferrum" do
@@ -53,8 +53,8 @@ class Browserctl < Formula
   end
 
   resource "nokogiri" do
-    url "https://rubygems.org/downloads/nokogiri-1.19.3-arm64-darwin.gem"
-    sha256 "71b9bd424b1b7abc18b05052a1a3cfd3627abdca62be280854cc411791357e42"
+    url "https://rubygems.org/downloads/nokogiri-1.19.4-arm64-darwin.gem"
+    sha256 "a46db9853286e6597b36ebc6953817d15acf3a299583eb3f89fdc6f91dd63527"
   end
 
   resource "optimist" do

@@ -3,14 +3,14 @@
 class Textus < Formula
   desc "Durable multi-writer project memory for humans, AI, and automation"
   homepage "https://github.com/patrick204nqh/textus"
-  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.54.0.tar.gz"
-  sha256 "99923cc071c7b976d3965500c4bf895828584b52742635944ac6706258d17a63"
+  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.54.2.tar.gz"
+  sha256 "d9024d91b224b14edb9c485adc870e4ab9482d4e2d6525a7a646576ee0bf18f7"
   license "MIT"
 
-  # bottle-source-digest: 427f1466283c2cadacbdcedd00d5e30887b76260e436b578971639a211a103ae
+  # bottle-source-digest: 203c5e31d4261958f7ec603a11c32ad5e1b678ec061dc8ba75f800f0ae10c8a7
   bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/textus-v0.54.0"
-    sha256 cellar: :any, arm64_sequoia: "2f2947e346be0a0d41757811dca8e0b7cf778f9a439798ce692dc8514a2e70d9"
+    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/textus-v0.54.2"
+    sha256 cellar: :any, arm64_sequoia: "304f80852ea5ed63d4c11422e1010cd290e25e1d1dd0064b4bf0703cbbd17bb1"
   end
 
   depends_on "gmp"
@@ -27,6 +27,16 @@ class Textus < Formula
   end
 
   # ── BEGIN generated gem resources — managed by script/gen-formula, do not edit ──
+  resource "bigdecimal" do
+    url "https://rubygems.org/downloads/bigdecimal-4.1.2.gem"
+    sha256 "53d217666027eab4280346fba98e7d5b66baaae1b9c3c1c0ffe89d48188a3fbd"
+  end
+
+  resource "concurrent-ruby" do
+    url "https://rubygems.org/downloads/concurrent-ruby-1.3.6.gem"
+    sha256 "6b56837e1e7e5292f9864f34b69c5a2cbc75c0cf5338f1ce9903d10fa762d5ab"
+  end
+
   resource "csv" do
     url "https://rubygems.org/downloads/csv-3.3.5.gem"
     sha256 "6e5134ac3383ef728b7f02725d9872934f523cb40b961479f69cf3afa6c8e73f"
@@ -37,9 +47,69 @@ class Textus < Formula
     sha256 "750d06384d7b9c15d562c76291407d89e368dda4d4fff957eb94962d325a0dc0"
   end
 
-  resource "mustache" do
-    url "https://rubygems.org/downloads/mustache-1.1.2.gem"
-    sha256 "d420243400354da78ded2d81541b381ad8d94e8e9b95022d0d71d66f8ef36c00"
+  resource "dry-configurable" do
+    url "https://rubygems.org/downloads/dry-configurable-1.4.0.gem"
+    sha256 "e35d1b5f3c081753ef361f564919db79000f32cfa6f20ee3a3ba5921b41b73ce"
+  end
+
+  resource "dry-core" do
+    url "https://rubygems.org/downloads/dry-core-1.2.0.gem"
+    sha256 "0cc5a7da88df397f153947eeeae42e876e999c1e30900f3c536fb173854e96a1"
+  end
+
+  resource "dry-inflector" do
+    url "https://rubygems.org/downloads/dry-inflector-1.3.1.gem"
+    sha256 "7fb0c2bb04f67638f25c52e7ba39ab435d922a3a5c3cd196120f63accb682dcc"
+  end
+
+  resource "dry-initializer" do
+    url "https://rubygems.org/downloads/dry-initializer-3.2.0.gem"
+    sha256 "37d59798f912dc0a1efe14a4db4a9306989007b302dcd5f25d0a2a20c166c4e3"
+  end
+
+  resource "dry-logic" do
+    url "https://rubygems.org/downloads/dry-logic-1.6.0.gem"
+    sha256 "da6fedbc0f90fc41f9b0cc7e6f05f5d529d1efaef6c8dcc8e0733f685745cea2"
+  end
+
+  resource "dry-schema" do
+    url "https://rubygems.org/downloads/dry-schema-1.16.0.gem"
+    sha256 "cd3aaeabc0f1af66ec82a29096d4c4fb92a0a58b9dae29a22b1bbceb78985727"
+  end
+
+  resource "dry-struct" do
+    url "https://rubygems.org/downloads/dry-struct-1.8.1.gem"
+    sha256 "033868594c45241540172bf1ebbc8bb76b72b4f0717072325deba38ac13e80f1"
+  end
+
+  resource "dry-types" do
+    url "https://rubygems.org/downloads/dry-types-1.9.1.gem"
+    sha256 "baebeecdb9f8395d6c9d227b62011279440943e3ef2468fe8ccc1ba11467f178"
+  end
+
+  resource "hana" do
+    url "https://rubygems.org/downloads/hana-1.3.7.gem"
+    sha256 "5425db42d651fea08859811c29d20446f16af196308162894db208cac5ce9b0d"
+  end
+
+  resource "ice_nine" do
+    url "https://rubygems.org/downloads/ice_nine-0.11.2.gem"
+    sha256 "5d506a7d2723d5592dc121b9928e4931742730131f22a1a37649df1c1e2e63db"
+  end
+
+  resource "json_schemer" do
+    url "https://rubygems.org/downloads/json_schemer-2.5.0.gem"
+    sha256 "2f01fb4cce721a4e08dd068fc2030cffd0702a7f333f1ea2be6e8991f00ae396"
+  end
+
+  resource "logger" do
+    url "https://rubygems.org/downloads/logger-1.7.0.gem"
+    sha256 "196edec7cc44b66cfb40f9755ce11b392f21f7967696af15d274dde7edff0203"
+  end
+
+  resource "mcp" do
+    url "https://rubygems.org/downloads/mcp-0.20.0.gem"
+    sha256 "6b71bfc9a19f6dca34953bded1bd89cba75176a4f8bb293ce82ace065af584f9"
   end
 
   resource "psych" do
@@ -47,9 +117,19 @@ class Textus < Formula
     sha256 "eb7a57cef10c9d70173ff74e739d843ac3b2c019a003de48447b2963d81b1974"
   end
 
+  resource "regexp_parser" do
+    url "https://rubygems.org/downloads/regexp_parser-2.12.0.gem"
+    sha256 "35a916a1d63190ab5c9009457136ae5f3c0c7512d60291d0d1378ba18ce08ebb"
+  end
+
   resource "rexml" do
     url "https://rubygems.org/downloads/rexml-3.4.4.gem"
     sha256 "19e0a2c3425dfbf2d4fc1189747bdb2f849b6c5e74180401b15734bc97b5d142"
+  end
+
+  resource "simpleidn" do
+    url "https://rubygems.org/downloads/simpleidn-0.2.3.gem"
+    sha256 "08ce96f03fa1605286be22651ba0fc9c0b2d6272c9b27a260bc88be05b0d2c29"
   end
 
   resource "stringio" do
