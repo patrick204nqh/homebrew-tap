@@ -3,15 +3,11 @@
 class Textus < Formula
   desc "Durable multi-writer project memory for humans, AI, and automation"
   homepage "https://github.com/patrick204nqh/textus"
-  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.54.2.tar.gz"
-  sha256 "d9024d91b224b14edb9c485adc870e4ab9482d4e2d6525a7a646576ee0bf18f7"
+  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.55.1.tar.gz"
+  sha256 "1a724957cb65a46d1fae7e0f99393e98f4388b1ecf4b4208370e3e39b378838f"
   license "MIT"
 
   # bottle-source-digest: 203c5e31d4261958f7ec603a11c32ad5e1b678ec061dc8ba75f800f0ae10c8a7
-  bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/textus-v0.54.2"
-    sha256 cellar: :any, arm64_sequoia: "304f80852ea5ed63d4c11422e1010cd290e25e1d1dd0064b4bf0703cbbd17bb1"
-  end
 
   depends_on "gmp"
 
@@ -72,6 +68,11 @@ class Textus < Formula
     sha256 "da6fedbc0f90fc41f9b0cc7e6f05f5d529d1efaef6c8dcc8e0733f685745cea2"
   end
 
+  resource "dry-monads" do
+    url "https://rubygems.org/downloads/dry-monads-1.10.0.gem"
+    sha256 "68c90d77617c6ce88d60704fc3b233907e6320974152fe75ad947f968006ca39"
+  end
+
   resource "dry-schema" do
     url "https://rubygems.org/downloads/dry-schema-1.16.0.gem"
     sha256 "cd3aaeabc0f1af66ec82a29096d4c4fb92a0a58b9dae29a22b1bbceb78985727"
@@ -130,6 +131,11 @@ class Textus < Formula
   resource "simpleidn" do
     url "https://rubygems.org/downloads/simpleidn-0.2.3.gem"
     sha256 "08ce96f03fa1605286be22651ba0fc9c0b2d6272c9b27a260bc88be05b0d2c29"
+  end
+
+  resource "sqlite3" do
+    url "https://rubygems.org/downloads/sqlite3-2.9.5-arm64-darwin.gem"
+    sha256 "d0cf444a70fc9395d513cfbcc1e6719e224aa645314e3824cb0474c721425aa2"
   end
 
   resource "stringio" do
