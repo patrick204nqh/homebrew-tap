@@ -3,15 +3,11 @@
 class Textus < Formula
   desc "Durable multi-writer project memory for humans, AI, and automation"
   homepage "https://github.com/patrick204nqh/textus"
-  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.55.1.tar.gz"
-  sha256 "1a724957cb65a46d1fae7e0f99393e98f4388b1ecf4b4208370e3e39b378838f"
+  url "https://github.com/patrick204nqh/textus/archive/refs/tags/v0.55.2.tar.gz"
+  sha256 "85aa1a4fa3ba4c9e99a725c8335f9b46552af22a8e7a4ef5ae4ef680b2398bab"
   license "MIT"
 
   # bottle-source-digest: c05d45fe90a104076e5190fcc1384852aed6cd195d118dea3ba32577324329e6
-  bottle do
-    root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/textus-v0.55.1"
-    sha256 cellar: :any, arm64_sequoia: "1991552bf52ba50b8b06d5cf7a62e9f31f7c38c55018a4ab826ffd71ff8bc39c"
-  end
 
   depends_on "gmp"
 
@@ -70,11 +66,6 @@ class Textus < Formula
   resource "dry-logic" do
     url "https://rubygems.org/downloads/dry-logic-1.6.0.gem"
     sha256 "da6fedbc0f90fc41f9b0cc7e6f05f5d529d1efaef6c8dcc8e0733f685745cea2"
-  end
-
-  resource "dry-monads" do
-    url "https://rubygems.org/downloads/dry-monads-1.10.0.gem"
-    sha256 "68c90d77617c6ce88d60704fc3b233907e6320974152fe75ad947f968006ca39"
   end
 
   resource "dry-schema" do
