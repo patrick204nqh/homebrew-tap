@@ -43,8 +43,8 @@ class Browserctl < Formula
   end
 
   resource "concurrent-ruby" do
-    url "https://rubygems.org/downloads/concurrent-ruby-1.3.7.gem"
-    sha256 "4412caec3a5ea2e5fdc52076724c071a81f2c0593d83b2ac8cbb8ca63b3151b0"
+    url "https://rubygems.org/downloads/concurrent-ruby-1.3.8.gem"
+    sha256 "b2f1be836e968ccc78ccfce277ea79c72a88633f22306782c16ff23fb415d1e1"
   end
 
   resource "ferrum" do
