@@ -7,11 +7,11 @@ class Browserctl < Formula
   sha256 "75f0adcbad7ed5247a89fb332599305ffea5dd277177745b00433946acfe0e1e"
   license "MIT"
 
-  # bottle-source-digest: 1496c1ed6930b0a1bc7dfec229f37134de99d7f245a544f71c1c9d186ef1ea4b
+  # bottle-source-digest: c480ef6ae4e09f6d49058ad235bfee233341f1821db2c2ad04225feb13b14b8b
   bottle do
     root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/browserctl-v0.15.0"
-    rebuild 3
-    sha256 cellar: :any, arm64_sequoia: "850ec4868ce33725c4281e6d472209afb52e5e228fc4ba285718acf0f58f46ce"
+    rebuild 4
+    sha256 cellar: :any, arm64_tahoe: "5475c5e34254c7549533378f20cdb9daa4cc59bc6760fe37854cc1e4d4f50b1f"
   end
 
   depends_on "gmp"
@@ -43,8 +43,8 @@ class Browserctl < Formula
   end
 
   resource "concurrent-ruby" do
-    url "https://rubygems.org/downloads/concurrent-ruby-1.3.7.gem"
-    sha256 "4412caec3a5ea2e5fdc52076724c071a81f2c0593d83b2ac8cbb8ca63b3151b0"
+    url "https://rubygems.org/downloads/concurrent-ruby-1.3.8.gem"
+    sha256 "b2f1be836e968ccc78ccfce277ea79c72a88633f22306782c16ff23fb415d1e1"
   end
 
   resource "ferrum" do
