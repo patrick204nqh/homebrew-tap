@@ -7,11 +7,11 @@ class Browserctl < Formula
   sha256 "75f0adcbad7ed5247a89fb332599305ffea5dd277177745b00433946acfe0e1e"
   license "MIT"
 
-  # bottle-source-digest: 1496c1ed6930b0a1bc7dfec229f37134de99d7f245a544f71c1c9d186ef1ea4b
+  # bottle-source-digest: 74ac721c4014a28da02acebde1dfd3650c710beddff7a5bcec773d1321087d31
   bottle do
     root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/browserctl-v0.15.0"
-    rebuild 3
-    sha256 cellar: :any, arm64_sequoia: "850ec4868ce33725c4281e6d472209afb52e5e228fc4ba285718acf0f58f46ce"
+    rebuild 5
+    sha256 cellar: :any, arm64_tahoe: "1aab27431685b8805942f7d738671898e27bdc7151fe86f3fab0352d892e11c0"
   end
 
   depends_on "gmp"
