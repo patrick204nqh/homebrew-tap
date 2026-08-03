@@ -22,13 +22,13 @@ class Browserctl < Formula
   #
   # To update: run the build-ruby-runtime workflow for the desired version, then
   # replace the sha256 values below with the ones printed in the workflow summary.
-  RUBY_RUNTIME_VERSION = "3.3.11"
+  RUBY_RUNTIME_VERSION = "3.3.12"
 
   resource "ruby-runtime" do
     url "https://github.com/patrick204nqh/homebrew-tap/releases/download/" \
         "ruby-runtime-#{RUBY_RUNTIME_VERSION}/" \
         "ruby-runtime-#{RUBY_RUNTIME_VERSION}-arm64-darwin.tar.gz"
-    sha256 "20d0fdb6de2cec6c8085e1edf3553f9cab3437932087ff451ca44a7727dc7a40"
+    sha256 "6b7053301e0d8ed99d7f9aa50c55e8ff381c3bf4582c95e0b83848c62cdbf07c"
   end
 
   # ── BEGIN generated gem resources — managed by script/gen-formula, do not edit ──
