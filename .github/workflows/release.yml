@@ -26,7 +26,7 @@ jobs:
     outputs:
       formulas: ${{ steps.detect.outputs.formulas }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - uses: ./.github/actions/detect-formulas
@@ -47,7 +47,7 @@ jobs:
       matrix:
         formula: ${{ fromJson(needs.detect.outputs.formulas) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Publish and describe release
         env:
