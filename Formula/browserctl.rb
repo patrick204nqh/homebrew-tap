@@ -48,8 +48,8 @@ class Browserctl < Formula
   end
 
   resource "ferrum" do
-    url "https://rubygems.org/downloads/ferrum-0.17.2.gem"
-    sha256 "2c2540a850b211a46f4d81de21bfd62048f507e4c327d1807225c3823c17e6ee"
+    url "https://rubygems.org/downloads/ferrum-0.18.0.gem"
+    sha256 "4cb8be16e352fc1d75f087e9214b34ec1b93ba932410c730a4724909ca89d7c6"
   end
 
   resource "nokogiri" do
@@ -70,11 +70,6 @@ class Browserctl < Formula
   resource "racc" do
     url "https://rubygems.org/downloads/racc-1.8.1.gem"
     sha256 "4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f"
-  end
-
-  resource "webrick" do
-    url "https://rubygems.org/downloads/webrick-1.9.2.gem"
-    sha256 "beb4a15fc474defed24a3bda4ffd88a490d517c9e4e6118c3edce59e45864131"
   end
 
   resource "websocket-driver" do
