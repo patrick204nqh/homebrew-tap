@@ -17,13 +17,13 @@ class Textus < Formula
 
   # Bundled Ruby runtime — shared across all Ruby-based tap formulas.
   # See docs/architecture/decisions/001-arm64-only-bottles.md.
-  RUBY_RUNTIME_VERSION = "3.3.11"
+  RUBY_RUNTIME_VERSION = "3.3.13"
 
   resource "ruby-runtime" do
     url "https://github.com/patrick204nqh/homebrew-tap/releases/download/" \
         "ruby-runtime-#{RUBY_RUNTIME_VERSION}/" \
         "ruby-runtime-#{RUBY_RUNTIME_VERSION}-arm64-darwin.tar.gz"
-    sha256 "20d0fdb6de2cec6c8085e1edf3553f9cab3437932087ff451ca44a7727dc7a40"
+    sha256 "7c4c8fbd26d146e5c3d120be0285591336e0dc7a2d87313b2ca2e7100187392e"
   end
 
   # ── BEGIN generated gem resources — managed by script/gen-formula, do not edit ──
