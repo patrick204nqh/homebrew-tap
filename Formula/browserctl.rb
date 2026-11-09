@@ -7,11 +7,11 @@ class Browserctl < Formula
   sha256 "75f0adcbad7ed5247a89fb332599305ffea5dd277177745b00433946acfe0e1e"
   license "MIT"
 
-  # bottle-source-digest: c480ef6ae4e09f6d49058ad235bfee233341f1821db2c2ad04225feb13b14b8b
+  # bottle-source-digest: d3365a1803c392f68634362f6d907579d6bd05f1ca279a215b15c2af0b73352f
   bottle do
     root_url "https://github.com/patrick204nqh/homebrew-tap/releases/download/browserctl-v0.15.0"
-    rebuild 4
-    sha256 cellar: :any, arm64_tahoe: "5475c5e34254c7549533378f20cdb9daa4cc59bc6760fe37854cc1e4d4f50b1f"
+    rebuild 5
+    sha256 cellar: :any, arm64_tahoe: "1fdf274239537c340bfecd941f0f082c617377dfda46edb27d72355901b58c05"
   end
 
   depends_on "gmp"
@@ -33,8 +33,8 @@ class Browserctl < Formula
 
   # ── BEGIN generated gem resources — managed by script/gen-formula, do not edit ──
   resource "addressable" do
-    url "https://rubygems.org/downloads/addressable-2.9.0.gem"
-    sha256 "7fdf6ac3660f7f4e867a0838be3f6cf722ace541dd97767fa42bc6cfa980c7af"
+    url "https://rubygems.org/downloads/addressable-2.9.2.gem"
+    sha256 "9117c7e7d6ee07230e75ce41fb9401ae55354dc654fcd0e862ba41d539e9a610"
   end
 
   resource "base64" do
@@ -48,13 +48,13 @@ class Browserctl < Formula
   end
 
   resource "ferrum" do
-    url "https://rubygems.org/downloads/ferrum-0.17.2.gem"
-    sha256 "2c2540a850b211a46f4d81de21bfd62048f507e4c327d1807225c3823c17e6ee"
+    url "https://rubygems.org/downloads/ferrum-0.20.1.gem"
+    sha256 "3a33d27f3e48ec66a36f7eaffa29180a9f1f4ff32694e8f2bc43d249f47612dc"
   end
 
   resource "nokogiri" do
-    url "https://rubygems.org/downloads/nokogiri-1.19.4-arm64-darwin.gem"
-    sha256 "a46db9853286e6597b36ebc6953817d15acf3a299583eb3f89fdc6f91dd63527"
+    url "https://rubygems.org/downloads/nokogiri-1.19.7-arm64-darwin.gem"
+    sha256 "f27d7f25f4873fbc3aa35a2cc2fb680c98555fec1925348da439d0869d541142"
   end
 
   resource "optimist" do
@@ -70,11 +70,6 @@ class Browserctl < Formula
   resource "racc" do
     url "https://rubygems.org/downloads/racc-1.8.1.gem"
     sha256 "4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f"
-  end
-
-  resource "webrick" do
-    url "https://rubygems.org/downloads/webrick-1.9.2.gem"
-    sha256 "beb4a15fc474defed24a3bda4ffd88a490d517c9e4e6118c3edce59e45864131"
   end
 
   resource "websocket-driver" do
