@@ -33,8 +33,8 @@ class Browserctl < Formula
 
   # ── BEGIN generated gem resources — managed by script/gen-formula, do not edit ──
   resource "addressable" do
-    url "https://rubygems.org/downloads/addressable-2.9.0.gem"
-    sha256 "7fdf6ac3660f7f4e867a0838be3f6cf722ace541dd97767fa42bc6cfa980c7af"
+    url "https://rubygems.org/downloads/addressable-2.10.0.gem"
+    sha256 "5e13b9c001adf01dd65ad6e0d2a91d2bc07885c0ff2b83f48cbcd95e08d9de62"
   end
 
   resource "base64" do
@@ -48,13 +48,13 @@ class Browserctl < Formula
   end
 
   resource "ferrum" do
-    url "https://rubygems.org/downloads/ferrum-0.17.2.gem"
-    sha256 "2c2540a850b211a46f4d81de21bfd62048f507e4c327d1807225c3823c17e6ee"
+    url "https://rubygems.org/downloads/ferrum-0.20.2.gem"
+    sha256 "0bfa34ca95cf81800092c7dafaf8f6fdf75cd24e973300c653ac0669a1c42068"
   end
 
   resource "nokogiri" do
-    url "https://rubygems.org/downloads/nokogiri-1.19.4-arm64-darwin.gem"
-    sha256 "a46db9853286e6597b36ebc6953817d15acf3a299583eb3f89fdc6f91dd63527"
+    url "https://rubygems.org/downloads/nokogiri-1.19.7-arm64-darwin.gem"
+    sha256 "f27d7f25f4873fbc3aa35a2cc2fb680c98555fec1925348da439d0869d541142"
   end
 
   resource "optimist" do
@@ -72,19 +72,14 @@ class Browserctl < Formula
     sha256 "4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f"
   end
 
-  resource "webrick" do
-    url "https://rubygems.org/downloads/webrick-1.9.2.gem"
-    sha256 "beb4a15fc474defed24a3bda4ffd88a490d517c9e4e6118c3edce59e45864131"
-  end
-
   resource "websocket-driver" do
-    url "https://rubygems.org/downloads/websocket-driver-0.8.2.gem"
-    sha256 "97c556b019bf3410b4961002ac501621e9322d3f8a7bc02161a09301cc4c4146"
+    url "https://rubygems.org/downloads/websocket-driver-0.9.0.gem"
+    sha256 "4dfcc6ac0ea1b6771daf5fb54cbbca131e4d5922ea0a65ba2da980370dadbe9f"
   end
 
   resource "websocket-extensions" do
-    url "https://rubygems.org/downloads/websocket-extensions-0.1.5.gem"
-    sha256 "1c6ba63092cda343eb53fc657110c71c754c56484aad42578495227d717a8241"
+    url "https://rubygems.org/downloads/websocket-extensions-0.2.0.gem"
+    sha256 "6fb0d0f687aa8adc8eafa5ce68db36dfd6a8ebf232515040ce27c33c1291e589"
   end
   # ── END generated gem resources ──
 
